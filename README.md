@@ -1,68 +1,101 @@
-# Product Requirements Document – AnyBoot
+![AnyBoot Logo](logo.png)
+<!-- Note: Pure Markdown doesn't support centering or resizing images easily. -->
+<!-- If the logo needs resizing/centering, using <p align="center"><img src="logo.png" width="200"></p> is the common GFM workaround. -->
 
-## Overview
-AnyBoot is a live Linux-based utility designed to allow users to plan and execute advanced multi-boot setups on real hardware. It supports installing multiple operating systems incrementally using virtualization tools, with persistent configuration and ISO management from a user-accessible USB.
+# AnyBoot
+
+**Your Multi-Boot Workstation, Simplified.**
+
+<!-- Badges - Centering these often uses <p align="center"> in GFM -->
+[![Build Status](https://img.shields.io/github/actions/workflow/status/YourUsername/anyboot/build.yml?branch=main&label=Build&logo=githubactions&logoColor=white)](https://github.com/YourUsername/anyboot/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-v0.1.0--alpha-blue)](./) [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](./#contributing) [![Target Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20BSD%20(Target)-lightgrey)](./)
 
 ---
+
+## About AnyBoot
+
+AnyBoot is a portable, live-bootable application designed to help users plan, configure, and execute advanced multi-boot workstation setups with ease. It operates from a USB drive containing a minimal Debian 12 environment and enables the installation of Windows, Linux, and BSD systems into *real* hardware partitions using controlled, virtualized installers (QEMU).
+
+AnyBoot aims to remove the fear and complexity from multi-booting, providing a safe, guided environment to create powerful, customized workstation environments quickly and reliably.
+
+## The Problem We Solve
+
+Setting up a multi-boot PC is powerful but often involves:
+
+*   Complex and risky manual partitioning.
+*   Potential bootloader conflicts breaking existing OSes.
+*   Time-consuming sequential installs and multiple reboots.
+*   Difficulty managing various OS installer ISOs.
+*   Challenges in achieving a consistent, reproducible setup.
+
+AnyBoot tackles these issues head-on by providing an integrated, guided, and safer installation process.
+
+## Key Features
+
+*   🖥️ **Live USB System:** Boots into a minimal Debian 12 environment.
+*   🖱️ **Dual User Interface:** Graphical (Ungoogled Chromium) & Text (Lynx) modes via a unified Next.js app.
+*   💾 **Persistent Storage:** Uses dedicated USB partitions (incl. user-accessible exFAT) for ISOs, configs & logs.
+*   📐 **Layout Designer:** Interactively plan target disk partitions.
+*   🛡️ **Virtualized Installation:** Safely runs OS installers via QEMU targeting *real* partitions.
+*   ➕ **Flexible & Incremental:** Install one OS now, add more later, or setup all at once.
+*   🚀 **rEFInd Integration:** Automatically installs & configures the rEFInd boot manager.
+*   🔄 **ISO Management:** Tools to download and update OS installation ISOs.
 
 ## Goals
 
-- Provide a persistent, self-contained live system to manage multi-OS installations
-- Allow ISO-based installs of Windows, Linux, BSD using QEMU
-- Store configuration data in a dedicated, isolated local database (MongoDB)
-- Store logs, ISO files, and user scripts on an exFAT partition for cross-OS accessibility
-- Offer both graphical and text-based UI
+*   **Simplify:** Abstract away the complexities of partitioning and bootloader management.
+*   **Enhance Safety:** Minimize risks during installation using QEMU virtualization.
+*   **Provide Flexibility:** Support incremental, full, and potentially scripted setups.
+*   **Ensure Portability:** Run entirely from a USB with persistent, user-accessible data.
+*   **Offer Accessibility:** Cater to users via both GUI and Text interfaces.
+*   **Facilitate Reproducibility:** Allow saving and loading of configurations.
+
+## Technology Stack
+
+AnyBoot leverages a modern web stack within a tailored Linux environment:
+
+*   **Base OS:** Debian 12 Live
+*   **App Framework:** Next.js (React)
+*   **Backend/API:** Next.js API Routes
+*   **Async Tasks:** Redis Queue
+*   **Virtualization:** QEMU/KVM + OVMF (UEFI)
+*   **Databases:** MongoDB (Config/State) & SQLite (Tracking)
+*   **Bootloader:** rEFInd
+
+For a detailed breakdown, see [project-techstack.md](project-techstack.md).
+
+## Getting Started
+
+*AnyBoot is currently under active development. These are the intended steps:*
+
+1.  **Download:** Obtain the latest AnyBoot USB image (`.img` file).
+2.  **Flash:** Write the image to a USB drive (minimum 16GB recommended) using tools like BalenaEtcher or `dd`.
+3.  **Boot:** Boot your computer from the prepared AnyBoot USB drive.
+4.  **Setup Persistence:** On first boot, follow the prompts to set up the persistent partitions on the USB drive itself.
+5.  **Use AnyBoot:** The main application will launch automatically. Use the interface (GUI or Text) to:
+    *   Design your target disk layout.
+    *   Select OSes and provide ISO download links.
+    *   Initiate the installation process.
+    *   Follow the on-screen instructions for each OS installation within the QEMU window.
+6.  **Reboot:** Once AnyBoot confirms completion and rEFInd setup, reboot your system (removing the AnyBoot USB) into your new multi-boot environment!
+
+## Current Progress & Roadmap
+
+This project is in its early stages. Development progress, including planned features, epics, and user stories, is tracked in the [**Project Plan**](project-plan.md).
+
+The initial focus (v1.0 target) is on delivering the core workflow for installing Windows 11 and common Linux distributions (e.g., Ubuntu) reliably.
+
+## Contributing
+
+Contributions are welcome! Whether it's bug reports, feature suggestions, documentation improvements, or code contributions, your help is appreciated.
+
+1.  **Issues:** Please check the existing [Issues](https://github.com/YourUsername/anyboot/issues) before creating a new one. Use templates if available.
+2.  **Pull Requests:** For code changes, please open an issue first to discuss the proposed changes. Follow the guidelines in `CONTRIBUTING.md` (to be created) and ensure adherence to the [Coding Guidelines](coding-guidelines.md).
+3.  **Code Style:** Please follow the guidelines outlined in [coding-guidelines.md](coding-guidelines.md).
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Functional Requirements
-
-1. **Bootable Environment**
-   - Based on Debian 12 Live
-   - Automatic login to lightweight window manager
-   - Launch app fullscreen
-
-2. **UI Options**
-   - Fullscreen browser (Chromium) in GUI
-   - Lynx-based UI in CLI mode
-
-3. **Partitioning Tool**
-   - Visual and scriptable partition designer
-   - Uses parted and mkfs tools
-   - Stores layouts in MongoDB
-
-4. **ISO Management**
-   - Download ISO from HTTPS links
-   - Validate and cache in exFAT partition
-   - Show download status and history
-
-5. **Virtualized Installation**
-   - Launch ISO in QEMU with target partition
-   - Monitor install progress and logs
-   - Trigger rEFInd update post-install
-
-6. **Persistence**
-   - MongoDB on dedicated 1GB ext4 partition
-   - Configs and logs on exFAT partition
-   - ISO cache on exFAT
-
-7. **System Requirements**
-   - Minimum USB: 16GB
-   - Partitions auto-configured on first boot
-
----
-
-## Non-Functional Requirements
-
-- Should operate fully offline after initial ISO downloads
-- Must not enforce user sign-in
-- Must operate reliably with minimal RAM (2GB+)
-- Fully open for personal use under Elastic 2.0 license
-
----
-
-## Future Features
-
-- Cloud config sync
-- USB-to-USB clone tool
-- Community shared layout templates
+*Copyright © 2025 Dataloes / Mikkel Georgsen*
