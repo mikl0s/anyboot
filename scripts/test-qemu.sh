@@ -56,4 +56,3 @@ qemu-system-x86_64 \
     $OVMF_PARAM
 
 echo "QEMU instance finished."
-

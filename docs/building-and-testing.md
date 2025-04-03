@@ -5,10 +5,10 @@ This document outlines the process for building the AnyBoot live ISO image and t
 ## Prerequisites
 
 *   **Debian/Ubuntu based system:** The build process relies on `live-build`.
-*   **Required Packages:** `live-build`, `qemu-system-x86`, `qemu-utils`, `ovmf`
+*   **Required Packages:** `live-build`, `qemu-system-x86`, `qemu-utils`, `ovmf`, `git`, `make`
     ```bash
     sudo apt update
-    sudo apt install live-build qemu-system-x86 qemu-utils ovmf
+    sudo apt install --needed live-build qemu-system-x86 qemu-utils ovmf git make
     ```
 *   **Git:** To clone the repository.
 *   **Make:** To use the provided Makefile.
@@ -76,4 +76,3 @@ make test-clean
 *   `make test`: Launch QEMU test environment (builds ISO if needed).
 *   `make test-clean`: Remove the test disk image.
 *   `make help`: Show available targets.
-
