@@ -1,4 +1,4 @@
-![AnyBoot Logo](anyboot.png)
+![AnyBoot Logo](logo.png)
 
 # AnyBoot
 
