@@ -26,13 +26,15 @@ AnyBoot runs within a custom Debian 12 Live environment booted from a USB drive.
     *   Handles routing and UI logic.
 *   **Graphical Mode Browser:** Ungoogled Chromium (from Debian 12 packages)
     *   Runs in Kiosk mode (`--kiosk`) for a full-screen application experience.
-*   **Text Mode Browser:** Lynx
-    *   Used to render the same Next.js web application in a text-based terminal environment.
+*   **Text Mode Browser:** Browsh
+    *   Renders the Next.js web application in a TTY environment using Firefox's headless mode.
+    *   Provides a richer text-based experience compared to pure text browsers like Lynx.
 *   **Styling:** CSS Modules / Tailwind CSS / Emotion (TBD - choose one for consistency)
 *   **Real-time Updates:** WebSockets (primary) or Server-Sent Events (SSE) (fallback) for pushing progress/logs from backend to frontend.
 
 ### 3. Backend & Middleware
 
+*   **Web Server Binding:** Configurable to bind to `localhost` (default) or `0.0.0.0` (for network access).
 *   **Framework:** Next.js API Routes
     *   Provides serverless function endpoints for handling application logic.
 *   **Runtime:** Node.js (inherent to Next.js)
