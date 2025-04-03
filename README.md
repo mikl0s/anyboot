@@ -94,7 +94,13 @@ Contributions are welcome! Whether it's bug reports, feature suggestions, docume
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project uses the **Elastic License 2.0** (ELv2). We chose this license because:
+
+*   **Open Source for Security:** The source code is available for review and audit, enhancing security and trust.
+*   **Free for Personal Use:** Individuals can freely use AnyBoot for personal projects and non-commercial purposes.
+*   **Commercial Use Available:** For commercial use, please contact us to discuss licensing options.
+
+See the [LICENSE](LICENSE) file for full details.
 
 ---
 
