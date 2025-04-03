@@ -102,6 +102,18 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
     *   [ ] Ensure CLI tools can be run from within the live environment.
     *   [ ] Ensure CLI tools can potentially be run by mounting the USB's exFAT partition on another OS.
 
+## Epic: Development & Testing Workflow
+*   **Goal:** Establish a reliable process for building, testing, and iterating on the AnyBoot live image.
+*   **Stories:**
+    *   [ ] Automate the `live-build` process (e.g., via a `Makefile` or script).
+    *   [ ] Document the steps to build the `anyboot.iso` image.
+    *   [ ] Define the process for testing the built ISO using QEMU:
+        *   Create a virtual disk image (e.g., `qemu-img create -f raw anyboot-test.img 16G`).
+        *   Write the `anyboot.iso` to the virtual disk image (simulating `dd` or using QEMU's ISO boot capability initially).
+        *   Launch QEMU/KVM, attaching `anyboot-test.img` as a USB drive (`-drive if=none,id=stick,format=raw,file=anyboot-test.img -device usb-storage,drive=stick`).
+        *   Ensure UEFI boot via OVMF (`-bios /usr/share/ovmf/OVMF.fd` or similar).
+    *   [ ] Establish baseline tests to run within QEMU (e.g., check boot, persistence setup prompt, network access, UI launch).
+
 ## Epic: Documentation & Testing
 
 *   **Goal:** Document the project and ensure basic functionality through testing.
