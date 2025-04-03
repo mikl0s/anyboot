@@ -1,5 +1,0 @@
-#!/bin/sh
-set -e
-
-chmod +x /usr/local/bin/anyboot-first-boot-setup.sh
-chmod +x /etc/xdg/openbox/autostart

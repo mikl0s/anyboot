@@ -1,5 +1,5 @@
 LIVE_BUILD_DIR := live-build-config
-ISO_NAME := anyboot.iso
+ISO_NAME := live-image-amd64.hybrid.iso
 TEST_IMAGE_NAME := anyboot-test.img
 TEST_IMAGE_SIZE := 16G
 

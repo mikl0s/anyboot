@@ -5,7 +5,7 @@ lb config noauto \
     --distribution bookworm \
     --architectures amd64 \
     --archive-areas "main contrib non-free non-free-firmware" \
-    --debian-installer false \
+    --debian-installer none \
     --binary-images iso-hybrid \
     --iso-application "AnyBoot Live System" \
     --iso-preparer "AnyBoot Project <https://github.com/mikl0s/anyboot>" \
@@ -17,6 +17,5 @@ lb config noauto \
     --backports false \
     --bootappend-live "boot=live components persistence persistence-storage=filesystem username=anyboot hostname=anyboot" \
     --linux-flavours amd64 \
-    --package-lists anyboot \
     --chroot-filesystem squashfs \
     "${@}"
