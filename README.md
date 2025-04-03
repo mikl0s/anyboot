@@ -1,6 +1,4 @@
-![AnyBoot Logo](logo.png)
-<!-- Note: Pure Markdown doesn't support centering or resizing images easily. -->
-<!-- If the logo needs resizing/centering, using <p align="center"><img src="logo.png" width="200"></p> is the common GFM workaround. -->
+![AnyBoot Logo](anyboot.png)
 
 # AnyBoot
 
