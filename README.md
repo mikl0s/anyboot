@@ -5,7 +5,7 @@
 **Your Multi-Boot Workstation, Simplified.**
 
 <!-- Badges - Centering these often uses <p align="center"> in GFM -->
-[![Build Status](https://img.shields.io/github/actions/workflow/status/YourUsername/anyboot/build.yml?branch=main&label=Build&logo=githubactions&logoColor=white)](https://github.com/YourUsername/anyboot/actions) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blueviolet.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-v0.1.0--alpha-blue)](./) [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](./#contributing) [![Platform: Anything with UEFI](https://img.shields.io/badge/Platform-Anything%20with%20UEFI-lightgrey)](./)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/mikl0s/anyboot/build.yml?branch=main&label=Build&logo=githubactions&logoColor=white)](https://github.com/mikl0s/anyboot/actions) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blueviolet.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-v0.1.0--alpha-blue)](./) [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](./#contributing) [![Platform: Anything with UEFI](https://img.shields.io/badge/Platform-Anything%20with%20UEFI-lightgrey)](./)
 
 ---
 
