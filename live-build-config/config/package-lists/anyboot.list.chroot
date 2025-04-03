@@ -1,0 +1,76 @@
+# Base System
+live-boot
+systemd-sysv
+ifupdown
+locales
+sudo
+
+# Networking
+network-manager
+network-manager-gnome # For easier GUI config if needed later
+isc-dhcp-client
+net-tools
+wget
+curl
+ca-certificates
+openssh-client
+openssh-server # ssh
+
+# Basic Utilities
+dosfstools
+cifs-utils # Mount SMB/CIFS shares
+nfs-common # Mount NFS shares
+e2fsprogs
+exfatprogs
+parted
+util-linux
+lsblk
+gdisk
+cryptsetup-bin # For potential future LUKS support on target
+less
+vim-tiny
+nano
+git
+build-essential # Often needed for native Node.js modules
+
+# Developer/Admin Tools
+screen
+btop
+p7zip-full # p7zip
+pbzip2
+unrar
+unzip
+
+# GUI / Desktop Environment
+xserver-xorg
+xorg
+openbox
+lightdm # Display Manager
+xinit
+x11-utils
+xterm # Basic terminal
+# feh # Simple image viewer/background setter (optional)
+# tint2 # Lightweight panel (optional)
+
+# AnyBoot Core Stack
+nodejs # Provides node and npm
+mongodb-server # From Debian repo, consider mongodb-org for official builds via hook
+redis-server
+
+# Browsers (Core Dependencies/Placeholders)
+firefox # Browsh dependency and general browser
+# browsh # Needs manual install/repo via hook
+
+# Virtualization
+qemu-system-x86
+qemu-utils
+ovmf # UEFI firmware for QEMU
+libvirt-daemon-system # Optional, but good for managing VMs if needed
+
+# Bootloader (for target system)
+refind
+
+# Hardware Support / Firmware
+firmware-linux-nonfree
+wireless-tools
+wpasupplicant

@@ -12,8 +12,8 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
 
 *   **Goal:** Create the basic bootable Debian 12 Live USB environment with persistence.
 *   **Stories:**
-    *   [ ] Define minimal Debian package set for the live OS.
-    *   [ ] Configure live-build (or alternative) to generate the base ISO.
+    *   [X] Define minimal Debian package set for the live OS. (`live-build-config/config/package-lists/anyboot.list.chroot`)
+    *   [X] Configure live-build (or alternative) to generate the base ISO. (`live-build-config/auto/config`)
     *   [ ] Implement first-boot script to detect USB drive.
     *   [ ] Implement first-boot script to prompt user for persistence setup.
     *   [ ] Implement logic to create ESP (FAT32) partition on USB.
@@ -21,15 +21,18 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
     *   [ ] Implement logic to create MongoDB (ext4) partition on USB.
     *   [ ] Implement logic to create Data (exFAT) partition on USB.
     *   [ ] Configure the live system to correctly mount persistent partitions on boot.
-    *   [ ] Install lightweight Window Manager (WM).
-    *   [ ] Configure WM to auto-start the AnyBoot application container/browser.
+    *   [ ] Install Openbox Window Manager.
+    *   [ ] Configure Openbox (e.g., `rc.xml`) for basic session.
+    *   [ ] Configure LightDM (or alternative login manager/autostart script) to auto-start Openbox session and the AnyBoot Firefox instance.
     *   [ ] Install MongoDB service within the live environment.
     *   [ ] Configure MongoDB to use the dedicated ext4 partition.
     *   [ ] Install Redis service within the live environment.
     *   [ ] Install QEMU/KVM and OVMF packages.
     *   [ ] Install rEFInd package and `refind-install` script.
-    *   [ ] Install Ungoogled Chromium package.
-    *   [ ] Install Lynx package.
+    *   [ ] Install Firefox package.
+    *   [ ] Install Browsh (requires handling external dependencies/install script).
+    *   [ ] Install SMB/CIFS client tools (`cifs-utils`).
+    *   [ ] Install NFS client tools (`nfs-common`).
     *   [ ] Ensure basic networking (DHCP client) works out-of-the-box.
 
 ## Epic: User Interface (Web & Text)
@@ -45,11 +48,12 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
     *   [ ] Create component for displaying task progress and logs.
     *   [ ] Implement WebSocket/SSE client logic for real-time updates.
     *   [ ] Develop API route structure in Next.js.
-    *   [ ] Ensure UI renders correctly in Ungoogled Chromium (Kiosk Mode).
-    *   [ ] Ensure UI is functional and readable in Lynx (Text Mode).
+    *   [ ] Ensure UI renders correctly in Firefox (Kiosk Mode).
+    *   [ ] Ensure UI is functional and readable in Browsh (Text Mode).
     *   [ ] Implement UI theme selection/support (basic themes).
     *   [ ] Create UI element for user guidance/prompts (e.g., Windows driver warning).
     *   [ ] Add interface elements for triggering CLI tools (ISO update, config management).
+    *   [ ] Implement UI elements for configuring and mounting network shares (SMB/NFS).
 
 ## Epic: Backend & Core Logic
 

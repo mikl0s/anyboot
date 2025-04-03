@@ -16,15 +16,18 @@ AnyBoot runs within a custom Debian 12 Live environment booted from a USB drive.
 
 *   **OS:** Debian 12 (Slim/Minimal)
 *   **Boot Method:** Live USB Image
-*   **Window Manager:** Lightweight WM (e.g., Openbox, i3, or similar TBD) - Auto-launches the AnyBoot UI.
+*   **Display Server:** Xorg
+*   **Display Manager:** LightDM
+*   **Window Manager:** Openbox
+    *   Lightweight, highly configurable stacking window manager.
+    *   Configuration managed via XML files (e.g., `rc.xml`, `menu.xml`).
 *   **Persistence:** Achieved via dedicated partitions on the USB drive (see Storage Layout).
 
 ### 2. Frontend & User Interface
 
-*   **Framework:** Next.js (React-based)
-    *   Provides Server-Side Rendering (SSR) or Static Site Generation (SSG) for the UI.
-    *   Handles routing and UI logic.
-*   **Graphical Mode Browser:** Ungoogled Chromium (from Debian 12 packages)
+*   **Framework:** Next.js (React)
+    *   Handles routing, UI logic, and server-side rendering/API routes.
+*   **Graphical Mode Browser:** Firefox
     *   Runs in Kiosk mode (`--kiosk`) for a full-screen application experience.
 *   **Text Mode Browser:** Browsh
     *   Renders the Next.js web application in a TTY environment using Firefox's headless mode.
@@ -55,9 +58,19 @@ AnyBoot runs within a custom Debian 12 Live environment booted from a USB drive.
     *   Database file stored likely within the MongoDB partition or System partition.
 *   **USB Storage Layout:**
     *   **Partition 1 (ESP):** `FAT32` (~512MB) - For UEFI boot files.
-    *   **Partition 2 (System):** `ext4` (~4GB) - Debian 12 OS, AnyBoot application, Chromium, supporting tools.
+    *   **Partition 2 (System):** `ext4` (~4GB) - Debian 12 OS, AnyBoot application, Firefox, supporting tools.
     *   **Partition 3 (MongoDB):** `ext4` (~1GB) - Dedicated storage for MongoDB data files.
     *   **Partition 4 (Data):** `exFAT` (Remainder) - User-accessible storage for downloaded ISOs, exported configurations, logs, helper scripts.
+
+### 4. System Utilities & Integration
+
+*   **Partitioning:** `parted`, `gdisk`, `lsblk`, `e2fsprogs`, `exfatprogs`, `dosfstools`
+*   **Virtualization:** QEMU/KVM (`qemu-system-x86`, `ovmf`)
+*   **Bootloader (Target):** rEFInd (`refind`)
+*   **Networking:** NetworkManager, `isc-dhcp-client`
+*   **File Sharing Clients:** `cifs-utils` (SMB/CIFS), `nfs-common` (NFS)
+*   **Live Environment:** Debian 12 (Bookworm) base, built with `live-build`.
+*   **Hardware Support:** `firmware-linux-nonfree`
 
 ### 5. Virtualization / Emulation
 

@@ -8,7 +8,7 @@ AnyBoot is a portable, live-bootable application designed to help users plan, co
 
 *   **Live USB System:** Boots into a minimal Debian 12 environment.
 *   **Dual User Interface:**
-    *   **Graphical:** Full-screen Ungoogled Chromium (kiosk mode).
+    *   **Graphical:** Full-screen Firefox (kiosk mode).
     *   **Text:** Browsh browser interface (renders web apps in TTY).
 *   **Persistent Storage:** Uses dedicated USB partitions, including a user-accessible exFAT partition for ISOs, configurations, and logs.
 *   **Layout Designer:** Interactive interface to plan disk partitions.

@@ -26,13 +26,14 @@ Setting up a multi-boot PC is powerful but often involves:
 *   Challenges in achieving a consistent, reproducible setup.
 *   Limited options for BSD installation.
 *   Inability to handle complex partition layouts.
+*   Accessing network shares during the setup process to retrieve files or configurations can be difficult.
 
 **AnyBoot** tackles these issues head-on by providing an integrated, guided, and safer installation process.
 
 ## Key Features
 
 *   🖥️ **Live USB System:** Boots into a minimal Debian 12 environment.
-*   🖱️ **Dual User Interface:** Graphical (Ungoogled Chromium) & Text (Browsh) modes via a unified Next.js app.
+*   🖱️ **Dual User Interface:** Graphical (Firefox) & Text (Browsh) modes via a unified Next.js app.
 *   💾 **Persistent Storage:** Uses dedicated USB partitions (incl. user-accessible exFAT) for ISOs, configs & logs.
 *   📐 **Layout Designer:** Interactively plan target disk partitions.
 *   🛡️ **Virtualized Installation:** Safely runs OS installers via QEMU targeting *real* partitions.

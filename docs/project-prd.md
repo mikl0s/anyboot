@@ -46,7 +46,7 @@ AnyBoot is a software tool delivered as a bootable live USB environment designed
 
 ### 5.2. User Interface
 
-*   **UI-1:** As a user, I want the option to use either a graphical interface (via Ungoogled Chromium) or a text-based interface (via Browsh) to control AnyBoot.
+*   **UI-1:** As a user, I want the option to use either a graphical interface (via Firefox) or a text-based interface (via Browsh) to control AnyBoot.
 *   **UI-2:** As a user, in the graphical mode, I want the application to run full-screen (kiosk mode) for an immersive experience.
 *   **UI-3:** As a user, I want a clear and intuitive interface for designing the target disk partition layout.
 *   **UI-4:** As a user, I want to see real-time progress updates and logs for ongoing tasks like downloads and installations.
@@ -63,6 +63,7 @@ AnyBoot is a software tool delivered as a bootable live USB environment designed
 *   **CFG-6:** As a user, I want to load a previously saved configuration.
 *   **CFG-7:** As a user, I want AnyBoot to store my configurations and downloaded ISOs persistently on the USB drive's Data partition.
 *   **CFG-8:** As a user, I want an option in the settings to make the AnyBoot web server accessible over the network (bind to `0.0.0.0`), allowing me to use the graphical UI from another machine.
+*   **CFG-9:** As a user, I want the ability to specify and mount SMB/CIFS or NFS network shares to access ISOs or configurations stored elsewhere on my network.
 
 ### 5.4. OS Installation Process
 
@@ -87,13 +88,15 @@ AnyBoot is a software tool delivered as a bootable live USB environment designed
 
 ## 6. Design & UX Considerations
 
+*   **Environment:** Assumes a standard PC hardware environment capable of UEFI boot.
 *   **Simplicity:** The interface should guide the user clearly through the steps, abstracting complexity where possible.
-*   **Consistency:** The experience in both GUI (Chromium) and Text (Browsh) modes should be functionally equivalent, leveraging the single Next.js application base.
+*   **Consistency:** The experience in both GUI (Firefox) and Text (Browsh) modes should be functionally equivalent, leveraging the single Next.js application base.
 *   **Visual Feedback:** Provide clear indicators of progress, success, failure, and current state.
 *   **Safety Prompts:** Include clear warnings before destructive actions (partitioning) and reminders for post-install steps (driver updates).
 *   **ExFAT Partition Usability:** Ensure the Data partition is easily usable by common desktop OSes for managing ISOs and configs manually if desired.
 *   **rEFInd Theming:** Default rEFInd configuration should be clean and presentable. Consider including a few basic themes.
 *   **Network Accessibility:** If the `0.0.0.0` binding is enabled, provide clear instructions or feedback on how to access the UI from another device.
+*   **Network Share Access:** Provide an intuitive way to configure and access network shares if needed during the process.
 
 ## 7. Technical Requirements
 
@@ -114,7 +117,7 @@ AnyBoot is a software tool delivered as a bootable live USB environment designed
     *   One common Linux distribution installation (e.g., Ubuntu 22.04 LTS).
     *   A combination of Windows 11 + Ubuntu 22.04 LTS.
 *   USB persistence setup works correctly on first boot.
-*   Both GUI (Chromium) and Text (Browsh) modes are functional for the core workflow.
+*   Both GUI (Firefox) and Text (Browsh) modes are functional for the core workflow.
 *   rEFInd successfully detects and boots the installed OSes.
 *   Basic ISO download and management functionality is present.
 *   Basic configuration saving/loading is functional.
