@@ -1,0 +1,15 @@
+[Unit]
+Description=AnyBoot First Boot Persistence Setup
+# Run only once, after basic system is up
+ConditionPathExists=!/etc/anyboot-persistence-configured 
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/anyboot-first-boot-setup.sh
+StandardOutput=journal+console
+StandardError=journal+console
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

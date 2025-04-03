@@ -14,26 +14,26 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
 *   **Stories:**
     *   [X] Define minimal Debian package set for the live OS. (`live-build-config/config/package-lists/anyboot.list.chroot`)
     *   [X] Configure live-build (or alternative) to generate the base ISO. (`live-build-config/auto/config`)
-    *   [ ] Implement first-boot script to detect USB drive.
-    *   [ ] Implement first-boot script to prompt user for persistence setup.
-    *   [ ] Implement logic to create ESP (FAT32) partition on USB.
-    *   [ ] Implement logic to create System (ext4) partition on USB.
-    *   [ ] Implement logic to create MongoDB (ext4) partition on USB.
-    *   [ ] Implement logic to create Data (exFAT) partition on USB.
-    *   [ ] Configure the live system to correctly mount persistent partitions on boot.
-    *   [ ] Install Openbox Window Manager.
-    *   [ ] Configure Openbox (e.g., `rc.xml`) for basic session.
-    *   [ ] Configure LightDM (or alternative login manager/autostart script) to auto-start Openbox session and the AnyBoot Firefox instance.
-    *   [ ] Install MongoDB service within the live environment.
-    *   [ ] Configure MongoDB to use the dedicated ext4 partition.
-    *   [ ] Install Redis service within the live environment.
-    *   [ ] Install QEMU/KVM and OVMF packages.
-    *   [ ] Install rEFInd package and `refind-install` script.
-    *   [ ] Install Firefox package.
+    *   [P] Implement first-boot script to detect USB drive. (Placeholder: `config/includes.chroot/usr/local/bin/anyboot-first-boot-setup.sh`)
+    *   [P] Implement first-boot script to prompt user for persistence setup. (Placeholder script exists)
+    *   [P] Implement logic to create ESP (FAT32) partition on USB. (Placeholder script exists)
+    *   [P] Implement logic to create System (ext4) partition on USB. (Placeholder script exists)
+    *   [P] Implement logic to create MongoDB (ext4) partition on USB. (Placeholder script exists)
+    *   [P] Implement logic to create Data (exFAT) partition on USB. (Placeholder script exists)
+    *   [P] Configure the live system to correctly mount persistent partitions on boot. (Requires `persistence.conf` creation in script)
+    *   [X] Install Openbox Window Manager. (Via package list)
+    *   [X] Configure Openbox (e.g., `rc.xml`) for basic session. (Using defaults, autostart configured)
+    *   [X] Configure LightDM (or alternative login manager/autostart script) to auto-start Openbox session and the AnyBoot Firefox instance. (`config/includes.chroot/etc/lightdm/lightdm.conf.d/`, `config/includes.chroot/etc/xdg/openbox/autostart`)
+    *   [X] Install MongoDB service within the live environment. (Via package list, enabled via hook)
+    *   [ ] Configure MongoDB to use the dedicated ext4 partition. (Requires hook/script post-persistence setup)
+    *   [X] Install Redis service within the live environment. (Via package list, enabled via hook)
+    *   [X] Install QEMU/KVM and OVMF packages. (Via package list)
+    *   [X] Install rEFInd package and `refind-install` script. (Via package list)
+    *   [X] Install Firefox package. (Via package list)
     *   [ ] Install Browsh (requires handling external dependencies/install script).
-    *   [ ] Install SMB/CIFS client tools (`cifs-utils`).
-    *   [ ] Install NFS client tools (`nfs-common`).
-    *   [ ] Ensure basic networking (DHCP client) works out-of-the-box.
+    *   [X] Install SMB/CIFS client tools (`cifs-utils`). (Via package list)
+    *   [X] Install NFS client tools (`nfs-common`). (Via package list)
+    *   [X] Ensure basic networking (DHCP client) works out-of-the-box. (Via NetworkManager package, enabled via hook)
 
 ## Epic: User Interface (Web & Text)
 
@@ -105,9 +105,9 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
 ## Epic: Development & Testing Workflow
 *   **Goal:** Establish a reliable process for building, testing, and iterating on the AnyBoot live image.
 *   **Stories:**
-    *   [ ] Automate the `live-build` process (e.g., via a `Makefile` or script).
-    *   [ ] Document the steps to build the `anyboot.iso` image.
-    *   [ ] Define the process for testing the built ISO using QEMU:
+    *   [X] Automate the `live-build` process (e.g., via a `Makefile` or script). (`Makefile`)
+    *   [X] Document the steps to build the `anyboot.iso` image. (`docs/building-and-testing.md`)
+    *   [X] Define the process for testing the built ISO using QEMU: (`scripts/test-qemu.sh`, `docs/building-and-testing.md`)
         *   Create a virtual disk image (e.g., `qemu-img create -f raw anyboot-test.img 16G`).
         *   Write the `anyboot.iso` to the virtual disk image (simulating `dd` or using QEMU's ISO boot capability initially).
         *   Launch QEMU/KVM, attaching `anyboot-test.img` as a USB drive (`-drive if=none,id=stick,format=raw,file=anyboot-test.img -device usb-storage,drive=stick`).
