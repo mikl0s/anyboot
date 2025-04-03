@@ -5,7 +5,7 @@
 **Your Multi-Boot Workstation, Simplified.**
 
 <!-- Badges - Centering these often uses <p align="center"> in GFM -->
-[![Build Status](https://img.shields.io/github/actions/workflow/status/YourUsername/anyboot/build.yml?branch=main&label=Build&logo=githubactions&logoColor=white)](https://github.com/YourUsername/anyboot/actions) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-v0.1.0--alpha-blue)](./) [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](./#contributing) [![Target Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20BSD%20(Target)-lightgrey)](./)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/YourUsername/anyboot/build.yml?branch=main&label=Build&logo=githubactions&logoColor=white)](https://github.com/YourUsername/anyboot/actions) [![License: MIT](https://img.shields.io/badge/ELv2.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-v0.1.0--alpha-blue)](./) [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](./#contributing) [![Target Platforms](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20BSD%20(Target)-lightgrey)](./)
 
 ---
 
@@ -13,7 +13,7 @@
 
 AnyBoot is a portable, live-bootable application designed to help users plan, configure, and execute advanced multi-boot workstation setups with ease. It operates from a USB drive containing a minimal Debian 12 environment and enables the installation of Windows, Linux, and BSD systems into *real* hardware partitions using controlled, virtualized installers (QEMU).
 
-AnyBoot aims to remove the fear and complexity from multi-booting, providing a safe, guided environment to create powerful, customized workstation environments quickly and reliably.
+**AnyBoot** aims to remove the fear and complexity from multi-booting, providing a safe, guided environment to create powerful, customized workstation environments quickly and reliably.
 
 ## The Problem We Solve
 
@@ -24,19 +24,24 @@ Setting up a multi-boot PC is powerful but often involves:
 *   Time-consuming sequential installs and multiple reboots.
 *   Difficulty managing various OS installer ISOs.
 *   Challenges in achieving a consistent, reproducible setup.
+*   Limited options for BSD installation.
+*   Inability to handle complex partition layouts.
 
-AnyBoot tackles these issues head-on by providing an integrated, guided, and safer installation process.
+**AnyBoot** tackles these issues head-on by providing an integrated, guided, and safer installation process.
 
 ## Key Features
 
 *   🖥️ **Live USB System:** Boots into a minimal Debian 12 environment.
-*   🖱️ **Dual User Interface:** Graphical (Ungoogled Chromium) & Text (Lynx) modes via a unified Next.js app.
+*   🖱️ **Dual User Interface:** Graphical (Ungoogled Chromium) & Text (Browsh) modes via a unified Next.js app.
 *   💾 **Persistent Storage:** Uses dedicated USB partitions (incl. user-accessible exFAT) for ISOs, configs & logs.
 *   📐 **Layout Designer:** Interactively plan target disk partitions.
 *   🛡️ **Virtualized Installation:** Safely runs OS installers via QEMU targeting *real* partitions.
 *   ➕ **Flexible & Incremental:** Install one OS now, add more later, or setup all at once.
 *   🚀 **rEFInd Integration:** Automatically installs & configures the rEFInd boot manager.
 *   🔄 **ISO Management:** Tools to download and update OS installation ISOs.
+*   📝 **Configuration Management:** Save and load configurations for reproducible setups.
+*   🛠️ **Developer Tools:** Includes QEMU, rEFInd, and other development tools.
+*   📚 **Documentation:** Comprehensive documentation and guides.
 
 ## Goals
 
