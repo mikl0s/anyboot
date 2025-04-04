@@ -33,3 +33,9 @@ anyboot-test.img
 # OS Specific
 .DS_Store
 Thumbs.db
+
+# Next.js webapp
+webapp/node_modules
+webapp/.next
+webapp/out
+webapp/.env*.local
