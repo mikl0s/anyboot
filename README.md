@@ -38,6 +38,7 @@ Setting up a multi-boot PC is powerful but often involves:
 *   📐 **Layout Designer:** Interactively plan target disk partitions.
 *   🛡️ **Virtualized Installation:** Safely runs OS installers via QEMU targeting *real* partitions.
 *   ➕ **Flexible & Incremental:** Install one OS now, add more later, or setup all at once.
+*   💾 **Backup & Restore:** Integrated Clonezilla for backing up/restoring disks/partitions to network shares (SMB/NFS/SSHFS).
 *   🚀 **rEFInd Integration:** Automatically installs & configures the rEFInd boot manager.
 *   🔄 **ISO Management:** Tools to download and update OS installation ISOs.
 *   📝 **Configuration Management:** Save and load configurations for reproducible setups.
