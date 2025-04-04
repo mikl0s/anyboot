@@ -18,13 +18,13 @@ chroot/
 live-build-config/*.files
 live-build-config/*.install
 live-build-config/*.live
-live-build-config/*.packages # Added for files like live-image-amd64.packages
+live-build-config/live-image-amd64.packages
 live-build-config/config/bootstrap
 live-build-config/*.zsync
 live-build-config/config/packages.chroot/
 live-build-config/wget-log*
 live-build-config/.build/
-build_log.txt # Specific build script log
+build_log.txt
 *.log # General log files
 
 # Test Artifacts
