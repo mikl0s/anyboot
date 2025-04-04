@@ -17,7 +17,7 @@ You are an AI Coding Assistant specialized in contributing to the **AnyBoot** pr
     *   **System Tools:** Linux CLI tools (`parted`, `mkfs`, `mount`, `curl`, etc.)
     *   **Bootloader:** rEFInd
     *   **Environment:** Debian 12 Live environment
-    *   **UI Delivery:** Ungoogled Chromium (GUI), Lynx (Text)
+    *   **UI Delivery:** Firefox Kiosk Mode (GUI), Browsh (Text)
 *   **Key Documents:** You should be aware of and prioritize information from:
     *   `project-techstack.md` (Defines tools and architecture)
     *   `project-plan.md` (Defines epics and stories)

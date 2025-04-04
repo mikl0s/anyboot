@@ -9,11 +9,26 @@ yarn-error.log*
 # Live Build Artifacts
 *.iso
 *.hdd
-*.log
 binary/
 cache/
 chroot/
 .stage/
+
+# Live Build Generated Files & Logs
+live-build-config/*.files
+live-build-config/*.install
+live-build-config/*.live
+live-build-config/*.packages # Added for files like live-image-amd64.packages
+live-build-config/config/bootstrap
+live-build-config/*.zsync
+live-build-config/config/packages.chroot/
+live-build-config/wget-log*
+live-build-config/.build/
+build_log.txt # Specific build script log
+*.log # General log files
+
+# Test Artifacts
+anyboot-test.img
 
 # OS Specific
 .DS_Store

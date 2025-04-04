@@ -5,6 +5,8 @@ ISO_PATH="${1:-live-build-config/anyboot.iso}"
 TEST_IMAGE_NAME="anyboot-test.img"
 TEST_IMAGE_SIZE="16G"
 OVMF_CODE="/usr/share/ovmf/OVMF.fd" # Common path on Debian/Ubuntu
+CPU_CORES="2"
+MEMORY="4G"
 
 # Check if ISO exists
 if [ ! -f "$ISO_PATH" ]; then
@@ -35,24 +37,26 @@ fi
 echo "Starting QEMU..."
 echo "  ISO: $ISO_PATH"
 echo "  USB Disk: $TEST_IMAGE_NAME"
-echo "  Memory: 4G"
-echo "  CPU Cores: 2"
+echo "  Memory: $MEMORY"
+echo "  CPU Cores: $CPU_CORES"
 
 qemu-system-x86_64 \
     -enable-kvm \
-    -m 4G \
-    -smp 2 \
+    -m $MEMORY \
+    -smp $CPU_CORES \
     -cpu host \
     -boot d \
     -cdrom "$ISO_PATH" \
     -drive if=none,id=usbstick,format=raw,file="$TEST_IMAGE_NAME" \
     -device usb-storage,drive=usbstick \
-    -vga virtio \
-    -display gtk,gl=on \
+    -vga std \
+    -display default \
     -usb \
     -device usb-tablet \
-    -netdev user,id=net0 \
-    -device e1000,netdev=net0 \
+    -netdev bridge,id=net0,br=br0 \
+    -device virtio-net-pci,netdev=net0 \
+    -serial stdio \
+    -d int,cpu_reset \
     $OVMF_PARAM
 
 echo "QEMU instance finished."
