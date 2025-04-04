@@ -39,7 +39,7 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
 
 *   **Goal:** Develop the Next.js application providing both graphical and text-based user interfaces.
 *   **Stories:**
-    *   [ ] Setup Next.js project structure.
+    *   [X] Setup Next.js project structure.
     *   [ ] Design basic UI layout/wireframes.
     *   [ ] Implement main application shell/navigation.
     *   [ ] Create component for designing/visualizing disk partition layout.
