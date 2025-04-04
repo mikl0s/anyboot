@@ -55,6 +55,24 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
     *   [ ] Add interface elements for triggering CLI tools (ISO update, config management).
     *   [ ] Implement UI elements for configuring and mounting network shares (SMB/NFS).
 
+## Epic: Backup & Restore (Clonezilla Integration)
+
+*   **Goal:** Integrate Clonezilla to allow users to backup and restore entire disks or individual partitions to/from network storage (SMB, NFS, SSHFS).
+*   **Stories:**
+    *   [ ] Install Clonezilla and required tools (`clonezilla`, `cifs-utils`, `nfs-common`, `sshfs`, `pbzip2`, `p7zip`) into the live image package list.
+    *   [ ] Implement backend logic for managing network share connections (saving credentials securely if possible, managing mount points).
+    *   [ ] Implement persistence for network mounts across reboots (likely modifying `/etc/fstab` in the persistence layer).
+    *   [ ] Create UI for managing network shares (add/edit/remove SMB/NFS/SSHFS shares, toggle auto-mount).
+    *   [ ] Create UI for selecting source disk/partition for backup.
+    *   [ ] Create UI for selecting target network share and directory/image name for backup.
+    *   [ ] Create/Manage configuration file (e.g., `clonezilla_config.json`) for compression types (pbzip2, p7zip) and levels.
+    *   [ ] Create UI for selecting compression type and level for backups.
+    *   [ ] Implement backend logic to construct and execute non-interactive `ocs-sr` backup commands based on user selections.
+    *   [ ] Create UI for browsing network shares to select an existing Clonezilla image for restore.
+    *   [ ] Create UI for selecting target disk/partition for restore (with clear warnings).
+    *   [ ] Implement backend logic to construct and execute non-interactive `ocs-sr` restore commands based on user selections.
+    *   [ ] Display live output/progress of the `ocs-sr` command in a dedicated UI modal or log viewer.
+
 ## Epic: Backend & Core Logic
 
 *   **Goal:** Implement the backend API routes and core logic for managing installations.
