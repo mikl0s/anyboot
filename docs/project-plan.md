@@ -41,7 +41,7 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
 *   **Stories:**
     *   [X] Setup Next.js project structure.
     *   [ ] Design basic UI layout/wireframes.
-    *   [ ] Implement main application shell/navigation.
+    *   [X] Implement main application shell/navigation (Header, FooterNav, Zustand-based routing).
     *   [ ] Create component for designing/visualizing disk partition layout.
     *   [ ] Create component for listing/selecting OSes to install.
     *   [ ] Create component for managing ISO sources/URLs.
@@ -54,6 +54,15 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
     *   [ ] Create UI element for user guidance/prompts (e.g., Windows driver warning).
     *   [ ] Add interface elements for triggering CLI tools (ISO update, config management).
     *   [ ] Implement UI elements for configuring and mounting network shares (SMB/NFS).
+    *   [x] Step 1: Welcome & Initialization - Card layout, system status, action buttons (Navigate to Step 2).
+    *   [x] Step 2: Target Disk Selection - Display mock disks, allow selection/expansion, connect selection to global state.
+    *   [P] Step 3: Partition Layout - Graphical view, partition editor:
+        *   [x] Display graphical disk layout bar based on state.
+        *   [x] Display table of allocated partitions.
+        *   [x] Implement partition deletion (basic - marks as unallocated).
+        *   [ ] Implement partition adding.
+        *   [ ] Implement partition editing.
+        *   [ ] Implement merging of adjacent unallocated blocks.
 
 ## Epic: Backup & Restore (Clonezilla Integration)
 
@@ -77,6 +86,7 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
 
 *   **Goal:** Implement the backend API routes and core logic for managing installations.
 *   **Stories:**
+    *   [x] Implement state management for wizard flow (Zustand store).
     *   [ ] Implement API route for listing available disks/partitions on the host machine.
     *   [ ] Implement API route for creating partitions (`parted` wrapper).
     *   [ ] Implement API route for formatting partitions (`mkfs` wrapper).
@@ -149,3 +159,28 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
     *   [ ] (Optional) Setup basic integration tests for API routes.
 
 ---
+### Phase 2: Core Logic Implementation (TBD)
+### Phase 3: Advanced Features & Polishing (TBD)
+
+## Current Status (As of {{ CURRENT_DATE_TIME }})
+
+*   Basic UI shell (Header, Footer, Layout) implemented using Next.js and Tailwind CSS.
+*   Tokyo Night dark theme and basic light theme configured.
+*   Zustand store implemented for managing wizard step and selected disk ID.
+*   Footer navigation component (`FooterNav`) implemented, using Zustand for step logic and routing.
+*   Step 1 (Welcome) page implemented with navigation to Step 2 via Zustand action.
+*   Step 2 (Disk Selection) page implemented, displaying mock disks and connecting selection to Zustand store.
+*   Navigation between Step 1, Step 2, and Step 3 is functional.
+*   Step 3 (Partition Layout) page implemented:
+    *   Displays graphical bar representing mock partitions.
+    *   Displays table of allocated partitions.
+    *   Includes basic partition deletion functionality (marks as unallocated).
+*   Resolved Next.js hydration error related to whitespace in `layout.tsx`.
+
+## Next Steps
+
+*   Implement remaining partition actions in Step 3: Add, Edit, Merge Unallocated.
+*   Consider replacing mock data in Step 2/3 with real data fetched from backend API (once available).
+*   Implement backend API for disk/partition information.
+*   Refine UI styling and responsiveness.
+*   Implement remaining wizard steps (Bootloader, User Setup, Summary, Installation).
