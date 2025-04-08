@@ -4,11 +4,10 @@
  * ISO Manager CLI Script
  * 
  * This script can:
- * 1. Index the "Last 12 months" column from DistroWatch's popularity page
- * 2. Fetch and process a predefined list of ISOs from a JSON file
- * 3. Allow configuration through iso-manager.conf
- * 4. Auto commit and push changes to GitHub
- * 5. Verify ISO hash to detect changes
+ * 1. Fetch and process a predefined list of ISOs from a JSON file
+ * 2. Allow configuration through iso-manager.conf
+ * 3. Auto commit and push changes to GitHub
+ * 4. Verify ISO hash to detect changes
  */
 
 const https = require('https');
@@ -24,7 +23,6 @@ const { Readable } = require('stream');
 
 // Default configuration
 const DEFAULT_CONFIG = {
-  distroWatchUrl: 'https://distrowatch.com/dwres.php?resource=popularity',
   defaultIsoListUrl: 'https://raw.githubusercontent.com/mikl0s/iso-list/refs/heads/main/links.json',
   outputFormat: 'text',
   maxResults: 0, // 0 means unlimited
@@ -85,7 +83,6 @@ Usage:
   node iso-manager.js [mode] [options]
 
 Modes:
-  distrowatch     Fetch Linux distribution popularity data from DistroWatch
   list            Fetch ISOs from a predefined JSON list
   verify          Verify and update ISO hashes
   download        Download an ISO file
@@ -105,7 +102,6 @@ Options:
   --help, -h      Show this help message
 
 Examples:
-  node iso-manager.js distrowatch -l 10 -j
   node iso-manager.js list --url https://example.com/isos.json --save list.json
   node iso-manager.js verify -g
   node iso-manager.js download --test
@@ -175,7 +171,6 @@ function showHelp() {
   console.log('Usage: node iso-manager.js [command] [options]');
   console.log('');
   console.log('Commands:');
-  console.log('  distrowatch [URL]      Scrape DistroWatch popularity page');
   console.log('  list [URL]             Get ISOs from a JSON list URL');
   console.log('  verify [URL]           Verify and update ISO hashes');
   console.log('  download [URL]         Download an ISO file');
@@ -259,72 +254,6 @@ async function fetchData(url, maxRedirects = 5) {
       reject(new Error('Request timed out'));
     });
   });
-}
-
-/**
- * Parse HTML and extract distribution information from DistroWatch
- * @param {string} html - HTML content
- * @returns {Array<Object>} - Array of distribution objects
- */
-function parseDistroLinks(html) {
-  const dom = new JSDOM(html);
-  const document = dom.window.document;
-  
-  const distributions = [];
-  const baseUrl = 'https://distrowatch.com/';
-  
-  // Find all table rows with ranking data
-  const rows = document.querySelectorAll('tr');
-  
-  let inLastYearSection = false;
-  
-  for (const row of rows) {
-    // Check if this is the header for the "Last 12 months" section
-    const header = row.querySelector('th.Invert');
-    if (header && header.textContent.includes('Last 12 months')) {
-      inLastYearSection = true;
-      continue; // Skip the header row
-    }
-    
-    // If we haven't reached the "Last 12 months" section yet, skip
-    if (!inLastYearSection) {
-      continue;
-    }
-    
-    // If we encounter another header, we've moved beyond the "Last 12 months" section
-    if (row.querySelector('th.Invert')) {
-      break; // Exit the loop as we've processed all rows in the target section
-    }
-    
-    // Now process each data row
-    const rankCell = row.querySelector('th.phr1');
-    const nameCell = row.querySelector('td.phr2');
-    const hitsCell = row.querySelector('td.phr3');
-    
-    // Only process if all three cells exist
-    if (rankCell && nameCell && hitsCell) {
-      const link = nameCell.querySelector('a');
-      
-      if (link) {
-        const rank = rankCell.textContent.trim();
-        const name = link.textContent.trim();
-        const hits = hitsCell.textContent.trim().replace(/[^0-9]/g, ''); // Extract just the number
-        
-        // Construct the full URL by combining the base URL with the relative link
-        const relativeLink = link.getAttribute('href');
-        const fullLink = `${baseUrl}${relativeLink}`;
-        
-        distributions.push({
-          rank: parseInt(rank),
-          name,
-          link: fullLink,
-          hits: parseInt(hits)
-        });
-      }
-    }
-  }
-  
-  return distributions;
 }
 
 /**
@@ -1246,173 +1175,164 @@ async function downloadIso(isos, options) {
  */
 async function main() {
   try {
+    // Parse command-line arguments
+    const args = parseCommandLineArgs();
+    
+    // Load configuration
     const config = loadConfig();
-    const cliOptions = parseCommandLineArgs();
     
-    // Merge config and CLI options, with CLI taking precedence
-    const options = {
-      outputJson: cliOptions.outputJson || config.outputFormat === 'json',
-      savePath: cliOptions.savePath || config.saveFile,
-      limit: cliOptions.limit || config.maxResults,
-      useGit: cliOptions.useGit,
-      verifyHash: cliOptions.verifyHash,
-      hashMatch: cliOptions.hashMatch || config.hashMatch,
-      download: cliOptions.download || cliOptions.mode === 'download',
-      test: cliOptions.test,
-      downloadDir: cliOptions.downloadDir || path.join(process.cwd(), 'downloads')
-    };
-    
-    let data = [];
-    
-    // Determine operation mode
-    if (cliOptions.mode === 'distrowatch') {
-      const targetUrl = cliOptions.targetUrl || config.distroWatchUrl;
-      console.log(`Fetching Linux distribution popularity data from: ${targetUrl}`);
-      
-      // Check if we have a local copy of the HTML to use
-      let html;
-      const localFile = path.join(process.cwd(), 'distrowatch_popularity.html');
-      
-      if (fs.existsSync(localFile)) {
-        console.log(`Using local file: ${localFile}`);
-        html = fs.readFileSync(localFile, 'utf8');
-      } else {
-        console.log('Downloading from DistroWatch...');
-        html = await fetchData(targetUrl);
-      }
-      
-      data = parseDistroLinks(html);
-    } else if (cliOptions.mode === 'list') {
-      const targetUrl = cliOptions.targetUrl || config.defaultIsoListUrl;
-      console.log(`Fetching ISO list from: ${targetUrl}`);
-      data = await fetchIsoList(targetUrl);
-      
-      // Verify hashes if requested
-      if (options.verifyHash) {
-        console.log('Verifying ISO hashes...');
-        const originalData = [...data];
-        data = await Promise.all(data.map(verifyIsoHash));
-        
-        // Check for changes
-        const changedIsos = data.filter(iso => iso.changed === true);
-        if (changedIsos.length > 0) {
-          console.log(`\n⚠️ ${changedIsos.length} ISO(s) have changed:`);
-          changedIsos.forEach(iso => {
-            console.log(`- ${iso.name}: Hash changed`);
-            // Update hash with the new one
-            iso.hash = iso.currentHash;
-            delete iso.currentHash;
-            delete iso.changed;
-          });
-        } else {
-          console.log('\n✅ All ISO hashes verified - no changes detected');
-        }
-      }
-      
-      // Download ISO if requested
-      if (options.download) {
-        await downloadIso(data, {
-          downloadDir: options.downloadDir,
-          testMode: options.test
-        });
-      }
-    } else if (cliOptions.mode === 'verify') {
-      const targetUrl = cliOptions.targetUrl || config.defaultIsoListUrl;
-      console.log(`Fetching ISO list from: ${targetUrl}`);
-      data = await fetchIsoList(targetUrl);
-      
-      console.log('Verifying ISO hashes...');
-      data = await Promise.all(data.map(verifyIsoHash));
-      
-      // Check for changes
-      const changedIsos = data.filter(iso => iso.changed === true);
-      if (changedIsos.length > 0) {
-        console.log(`\n⚠️ ${changedIsos.length} ISO(s) have changed:`);
-        changedIsos.forEach(iso => {
-          console.log(`- ${iso.name}: Hash changed from ${iso.hash} to ${iso.currentHash}`);
-          // Update hash with the new one
-          iso.hash = iso.currentHash;
-          delete iso.currentHash;
-          delete iso.changed;
-        });
-      } else {
-        console.log('\n✅ All ISO hashes verified - no changes detected');
-      }
-    } else if (cliOptions.mode === 'download') {
-      const targetUrl = cliOptions.targetUrl || config.defaultIsoListUrl;
-      console.log(`Fetching ISO list from: ${targetUrl}`);
-      data = await fetchIsoList(targetUrl);
-      
-      // Download and verify ISO
-      await downloadIso(data, {
-        downloadDir: options.downloadDir,
-        testMode: options.test
-      });
-    } else { 
-      // Default mode - try to detect the URL
-      const targetUrl = cliOptions.targetUrl || config.defaultIsoListUrl;
-      
-      if (targetUrl.includes('distrowatch')) {
-        console.log(`Fetching Linux distribution popularity data from: ${targetUrl}`);
-        const html = await fetchData(targetUrl);
-        data = parseDistroLinks(html);
-      } else {
-        console.log(`Fetching ISO list from: ${targetUrl}`);
-        data = await fetchIsoList(targetUrl);
-        
-        // Verify hashes if requested
-        if (options.verifyHash) {
-          console.log('Verifying ISO hashes...');
-          data = await Promise.all(data.map(verifyIsoHash));
-        }
-        
-        // Download ISO if requested
-        if (options.download) {
-          await downloadIso(data, {
-            downloadDir: options.downloadDir,
-            testMode: options.test
-          });
-        }
+    // Set default values if not provided
+    if (!args.targetUrl) {
+      if (args.mode === 'list') {
+        args.targetUrl = config.defaultIsoListUrl;
       }
     }
     
-    // Only output and save results if not in download-only mode
-    if (!options.download || cliOptions.mode !== 'download') {
-      // Output the results and get the save path if a file was saved
-      const savePath = outputResults(data, options);
-      
-      // Auto-commit and push changes to GitHub if git option is enabled and a file was saved
-      if (options.useGit && savePath) {
-        if (!config.gitRepo) {
-          console.error('Error: gitRepo not specified in config');
-          return;
-        }
-        
-        // Create ISO list repo directory if it doesn't exist
-        const repoDir = path.resolve(process.cwd(), 'iso-list-repo');
-        if (!fs.existsSync(repoDir)) {
-          fs.mkdirSync(repoDir, { recursive: true });
-        }
-        
-        // Clone/update the repository
-        console.log(`\nSetting up Git repository at ${repoDir}`);
-        await ensureGitRepo(config.gitRepo, repoDir, config.gitBranch || 'main');
-        
-        // Copy the saved file to the repo
-        const filename = path.basename(savePath);
-        const targetFile = path.join(repoDir, filename);
-        fs.copyFileSync(savePath, targetFile);
-        console.log(`Copied ${savePath} to ${targetFile}`);
-        
-        // Commit and push changes
-        const timestamp = new Date().toISOString();
-        const commitMessage = `Update ISO list - ${timestamp}`;
-        await gitCommitAndPush(repoDir, {
-          message: commitMessage,
-          branch: config.gitBranch || 'main',
-          remote: 'origin'
-        });
+    if (!args.hashMatch && config.hashMatch) {
+      args.hashMatch = config.hashMatch;
+    }
+    
+    // Create download directory if it doesn't exist
+    if (args.download || args.mode === 'download') {
+      const downloadDir = args.downloadDir || './downloads';
+      if (!fs.existsSync(downloadDir)) {
+        fs.mkdirSync(downloadDir, { recursive: true });
       }
+      args.downloadDir = downloadDir;
+    }
+    
+    let results = [];
+    
+    // Execute the selected mode
+    switch (args.mode) {
+      case 'list': {
+        if (!args.targetUrl) {
+          console.error('Error: No target URL provided for ISO list');
+          process.exit(1);
+        }
+        
+        console.log(`Fetching ISO list from ${args.targetUrl}...`);
+        results = await fetchIsoList(args.targetUrl);
+        
+        // Apply limit if specified
+        if (args.limit > 0 && results.length > args.limit) {
+          results = results.slice(0, args.limit);
+        }
+        
+        // Output or save results
+        outputResults(results, {
+          format: args.outputJson ? 'json' : 'text',
+          savePath: args.savePath,
+          useGit: args.useGit,
+          gitRepo: config.gitRepo,
+          gitBranch: config.gitBranch
+        });
+        
+        // Verify hashes if requested
+        if (args.verifyHash) {
+          console.log('Verifying ISO hashes...');
+          let updatedResults = [];
+          
+          for (const iso of results) {
+            const result = await verifyIsoHash(iso);
+            updatedResults.push(result);
+          }
+          
+          // Update results with verified hashes
+          results = updatedResults;
+          
+          // Save verified results if a path is provided
+          if (args.savePath) {
+            fs.writeFileSync(args.savePath, JSON.stringify(results, null, 2));
+            console.log(`Updated hash information saved to ${args.savePath}`);
+          }
+          
+          // Commit and push changes if using Git
+          if (args.useGit) {
+            const repoPath = path.dirname(args.savePath);
+            gitCommitAndPush(repoPath, {
+              message: 'Update ISO hashes',
+              remote: 'origin',
+              branch: config.gitBranch
+            });
+          }
+        }
+        
+        break;
+      }
+      
+      case 'verify': {
+        let isos = [];
+        
+        if (args.targetUrl) {
+          console.log(`Fetching ISO list from ${args.targetUrl}...`);
+          isos = await fetchIsoList(args.targetUrl);
+        } else if (args.savePath && fs.existsSync(args.savePath)) {
+          console.log(`Loading ISO list from ${args.savePath}...`);
+          const fileContent = fs.readFileSync(args.savePath, 'utf8');
+          isos = JSON.parse(fileContent);
+        } else {
+          console.log(`Fetching ISO list from default URL: ${config.defaultIsoListUrl}...`);
+          isos = await fetchIsoList(config.defaultIsoListUrl);
+        }
+        
+        console.log('Verifying ISO hashes...');
+        let updatedIsos = [];
+        
+        for (const iso of isos) {
+          const result = await verifyIsoHash(iso);
+          updatedIsos.push(result);
+        }
+        
+        // Save verified results
+        if (args.savePath) {
+          fs.writeFileSync(args.savePath, JSON.stringify(updatedIsos, null, 2));
+          console.log(`Verified hash information saved to ${args.savePath}`);
+        } else {
+          console.log('Verified ISO information:');
+          console.log(JSON.stringify(updatedIsos, null, 2));
+        }
+        
+        // Commit and push changes if using Git
+        if (args.useGit) {
+          const repoPath = args.savePath ? path.dirname(args.savePath) : '.';
+          gitCommitAndPush(repoPath, {
+            message: 'Update ISO hashes',
+            remote: 'origin',
+            branch: config.gitBranch
+          });
+        }
+        
+        break;
+      }
+      
+      case 'download': {
+        let isos = [];
+        
+        if (args.targetUrl) {
+          console.log(`Fetching ISO list from ${args.targetUrl}...`);
+          isos = await fetchIsoList(args.targetUrl);
+        } else if (args.savePath && fs.existsSync(args.savePath)) {
+          console.log(`Loading ISO list from ${args.savePath}...`);
+          const fileContent = fs.readFileSync(args.savePath, 'utf8');
+          isos = JSON.parse(fileContent);
+        } else {
+          console.log(`Fetching ISO list from default URL: ${config.defaultIsoListUrl}...`);
+          isos = await fetchIsoList(config.defaultIsoListUrl);
+        }
+        
+        await downloadIso(isos, {
+          downloadDir: args.downloadDir,
+          testMode: args.test
+        });
+        
+        break;
+      }
+      
+      default:
+        console.error(`Error: Unknown mode '${args.mode}'`);
+        console.log('Run with --help for usage information');
+        process.exit(1);
     }
   } catch (error) {
     console.error('Error:', error.message);

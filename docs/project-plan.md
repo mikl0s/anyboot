@@ -40,15 +40,15 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
 *   **Goal:** Develop the Next.js application providing both graphical and text-based user interfaces.
 *   **Stories:**
     *   [X] Setup Next.js project structure.
-    *   [ ] Design basic UI layout/wireframes.
+    *   [X] Design basic UI layout/wireframes.
     *   [X] Implement main application shell/navigation (Header, FooterNav, Zustand-based routing).
-    *   [ ] Create component for designing/visualizing disk partition layout.
+    *   [X] Create component for designing/visualizing disk partition layout.
     *   [ ] Create component for listing/selecting OSes to install.
     *   [ ] Create component for managing ISO sources/URLs.
     *   [ ] Create component for displaying task progress and logs.
     *   [ ] Implement WebSocket/SSE client logic for real-time updates.
     *   [ ] Develop API route structure in Next.js.
-    *   [ ] Ensure UI renders correctly in Firefox (Kiosk Mode).
+    *   [X] Ensure UI renders correctly in Firefox (Kiosk Mode).
     *   [ ] Ensure UI is functional and readable in Browsh (Text Mode).
     *   [ ] Implement UI theme selection/support (basic themes).
     *   [ ] Create UI element for user guidance/prompts (e.g., Windows driver warning).
@@ -56,13 +56,19 @@ This plan breaks down the AnyBoot project into manageable Epics and User Stories
     *   [ ] Implement UI elements for configuring and mounting network shares (SMB/NFS).
     *   [x] Step 1: Welcome & Initialization - Card layout, system status, action buttons (Navigate to Step 2).
     *   [x] Step 2: Target Disk Selection - Display mock disks, allow selection/expansion, connect selection to global state.
-    *   [P] Step 3: Partition Layout - Graphical view, partition editor:
+    *   [x] Step 3: Partition Layout - Graphical view, partition editor:
         *   [x] Display graphical disk layout bar based on state.
         *   [x] Display table of allocated partitions.
         *   [x] Implement partition deletion (basic - marks as unallocated).
-        *   [ ] Implement partition adding.
-        *   [ ] Implement partition editing.
-        *   [ ] Implement merging of adjacent unallocated blocks.
+        *   [x] Implement partition adding.
+        *   [x] Implement partition editing.
+        *   [x] Implement merging of adjacent unallocated blocks.
+    *   [P] Step 4: ISO Management & OS Installation:
+        *   [x] Auto-create exFAT ISO storage partition using all available space
+        *   [x] Add file browser for ISO storage showing available ISO files
+        *   [x] Integrate devicon for OS icon detection and display
+        *   [ ] Implement OS detection from ISO filename
+        *   [ ] Allow boot configuration for selected ISOs
 
 ## Epic: Backup & Restore (Clonezilla Integration)
 

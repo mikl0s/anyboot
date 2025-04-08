@@ -10,6 +10,7 @@ interface PartitionEditorState {
   isLoading: boolean;
   error: string | null;
   history: PartitionBlock[][];
+  isoStorageCreated: boolean; // Track if ISO storage has been created
 }
 
 interface PartitionEditorActions {
@@ -19,6 +20,7 @@ interface PartitionEditorActions {
   deletePartition: (blockId: string) => void;
   editPartition: (blockId: string) => void;
   mergeUnallocated: () => void;
+  createISOStoragePartition: () => void; // Add new action for auto-creating ISO storage
 }
 
 // Merge adjacent unallocated blocks for a cleaner partition view
@@ -58,6 +60,7 @@ const createPartitionEditorStore = () => create<PartitionEditorState & Partition
   isLoading: false,
   error: null,
   history: [],
+  isoStorageCreated: false,
 
   // Actions
   initializeState: (disk) => set(produce((draft) => {
@@ -74,11 +77,37 @@ const createPartitionEditorStore = () => create<PartitionEditorState & Partition
     isLoading: false,
     error: null,
     history: [],
+    isoStorageCreated: false,
   }, true),
 
-  addPartition: () => {
-    console.warn('addPartition action not implemented');
-  },
+  addPartition: () => set(produce((draft) => {
+    // Find the first unallocated block
+    const unallocatedIndex = draft.blocks.findIndex(b => !b.isAllocated);
+    if (unallocatedIndex === -1) return;
+    
+    const unallocatedBlock = draft.blocks[unallocatedIndex];
+    
+    // Default to taking the full unallocated space
+    const newPartitionSizeBytes = unallocatedBlock.sizeBytes;
+    const formattedSize = `${(newPartitionSizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
+    
+    // Create new partition block
+    const newPartition: PartitionBlock = {
+      id: `partition-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: `New Partition`, // This will be the device name later
+      type: 'part',
+      isAllocated: true,
+      sizeBytes: newPartitionSizeBytes,
+      size: formattedSize,
+      fsType: 'ext4', // Default filesystem type
+      label: 'New Partition',
+      uuid: null,
+      originalId: null,
+    };
+    
+    draft.blocks.splice(unallocatedIndex, 1, newPartition);
+    draft.history.push([...draft.blocks]);
+  }), true),
 
   deletePartition: (blockId) => set(produce((draft) => {
     const blockIndex = draft.blocks.findIndex(b => b.id === blockId);
@@ -103,9 +132,23 @@ const createPartitionEditorStore = () => create<PartitionEditorState & Partition
     draft.history.push([...draft.blocks]);
   }), true),
 
-  editPartition: (blockId) => {
-    console.warn('editPartition action not implemented');
-  },
+  editPartition: (blockId) => set(produce((draft) => {
+    const blockIndex = draft.blocks.findIndex(b => b.id === blockId);
+    if (blockIndex === -1 || !draft.blocks[blockIndex].isAllocated) return;
+    
+    // For now, just toggle between ext4 and ntfs as a proof of concept
+    const partition = draft.blocks[blockIndex];
+    const newFsType = partition.fsType === 'ext4' ? 'ntfs' : 'ext4';
+    
+    // Update the partition
+    draft.blocks[blockIndex] = {
+      ...partition,
+      fsType: newFsType,
+      label: `${newFsType.toUpperCase()} Partition`
+    };
+    
+    draft.history.push([...draft.blocks]);
+  }), true),
 
   mergeUnallocated: () => set(produce((draft) => {
     const originalCount = draft.blocks.length;
@@ -113,6 +156,45 @@ const createPartitionEditorStore = () => create<PartitionEditorState & Partition
     if (draft.blocks.length < originalCount) {
       draft.history.push([...draft.blocks]);
     }
+  }), true),
+
+  // Auto-create ISO storage partition using all available space
+  createISOStoragePartition: () => set(produce((draft) => {
+    // Only proceed if there's unallocated space and ISO storage hasn't been created yet
+    if (draft.isoStorageCreated) return;
+    
+    // Merge any adjacent unallocated spaces first
+    draft.blocks = mergeAdjacentUnallocated(draft.blocks);
+    
+    // Find all unallocated blocks
+    const unallocatedBlocks = draft.blocks.filter(b => !b.isAllocated);
+    if (unallocatedBlocks.length === 0) return;
+    
+    // Calculate total unallocated space
+    const totalUnallocatedBytes = unallocatedBlocks.reduce((sum, block) => sum + block.sizeBytes, 0);
+    
+    // Create new ISO storage partition with all available space
+    const newISOStorage: PartitionBlock = {
+      id: `iso-storage-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: 'ISO Storage',
+      type: 'part',
+      isAllocated: true,
+      sizeBytes: totalUnallocatedBytes,
+      size: `${(totalUnallocatedBytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`,
+      fsType: 'exfat', // exFAT for ISO storage
+      label: 'ISO Storage',
+      uuid: null,
+      originalId: null,
+    };
+    
+    // Replace all unallocated blocks with this new ISO storage partition
+    draft.blocks = draft.blocks.filter(b => b.isAllocated).concat(newISOStorage);
+    
+    // Mark ISO storage as created
+    draft.isoStorageCreated = true;
+    
+    // Update history
+    draft.history.push([...draft.blocks]);
   }), true),
 }));
 
@@ -165,11 +247,37 @@ export function usePartitionEditorActions() {
         isLoading: false,
         error: null,
         history: [],
+        isoStorageCreated: false,
       }, true),
       
-      addPartition: () => {
-        console.warn('addPartition action not implemented');
-      },
+      addPartition: () => partitionEditorStore.setState(produce((draft) => {
+        // Find the first unallocated block
+        const unallocatedIndex = draft.blocks.findIndex(b => !b.isAllocated);
+        if (unallocatedIndex === -1) return;
+        
+        const unallocatedBlock = draft.blocks[unallocatedIndex];
+        
+        // Default to taking the full unallocated space
+        const newPartitionSizeBytes = unallocatedBlock.sizeBytes;
+        const formattedSize = `${(newPartitionSizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`;
+        
+        // Create new partition block
+        const newPartition: PartitionBlock = {
+          id: `partition-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          name: `New Partition`, // This will be the device name later
+          type: 'part',
+          isAllocated: true,
+          sizeBytes: newPartitionSizeBytes,
+          size: formattedSize,
+          fsType: 'ext4', // Default filesystem type
+          label: 'New Partition',
+          uuid: null,
+          originalId: null,
+        };
+        
+        draft.blocks.splice(unallocatedIndex, 1, newPartition);
+        draft.history.push([...draft.blocks]);
+      }), true),
       
       deletePartition: (blockId: string) => partitionEditorStore.setState(produce((draft) => {
         const blockIndex = draft.blocks.findIndex(b => b.id === blockId);
@@ -194,9 +302,23 @@ export function usePartitionEditorActions() {
         draft.history.push([...draft.blocks]);
       }), true),
       
-      editPartition: (blockId: string) => {
-        console.warn('editPartition action not implemented');
-      },
+      editPartition: (blockId: string) => partitionEditorStore.setState(produce((draft) => {
+        const blockIndex = draft.blocks.findIndex(b => b.id === blockId);
+        if (blockIndex === -1 || !draft.blocks[blockIndex].isAllocated) return;
+        
+        // For now, just toggle between ext4 and ntfs as a proof of concept
+        const partition = draft.blocks[blockIndex];
+        const newFsType = partition.fsType === 'ext4' ? 'ntfs' : 'ext4';
+        
+        // Update the partition
+        draft.blocks[blockIndex] = {
+          ...partition,
+          fsType: newFsType,
+          label: `${newFsType.toUpperCase()} Partition`
+        };
+        
+        draft.history.push([...draft.blocks]);
+      }), true),
       
       mergeUnallocated: () => partitionEditorStore.setState(produce((draft) => {
         const originalCount = draft.blocks.length;
@@ -204,6 +326,44 @@ export function usePartitionEditorActions() {
         if (draft.blocks.length < originalCount) {
           draft.history.push([...draft.blocks]);
         }
+      }), true),
+      
+      createISOStoragePartition: () => partitionEditorStore.setState(produce((draft) => {
+        // Only proceed if there's unallocated space and ISO storage hasn't been created yet
+        if (draft.isoStorageCreated) return;
+        
+        // Merge any adjacent unallocated spaces first
+        draft.blocks = mergeAdjacentUnallocated(draft.blocks);
+        
+        // Find all unallocated blocks
+        const unallocatedBlocks = draft.blocks.filter(b => !b.isAllocated);
+        if (unallocatedBlocks.length === 0) return;
+        
+        // Calculate total unallocated space
+        const totalUnallocatedBytes = unallocatedBlocks.reduce((sum, block) => sum + block.sizeBytes, 0);
+        
+        // Create new ISO storage partition with all available space
+        const newISOStorage: PartitionBlock = {
+          id: `iso-storage-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          name: 'ISO Storage',
+          type: 'part',
+          isAllocated: true,
+          sizeBytes: totalUnallocatedBytes,
+          size: `${(totalUnallocatedBytes / (1024 * 1024 * 1024)).toFixed(2)} GiB`,
+          fsType: 'exfat', // exFAT for ISO storage
+          label: 'ISO Storage',
+          uuid: null,
+          originalId: null,
+        };
+        
+        // Replace all unallocated blocks with this new ISO storage partition
+        draft.blocks = draft.blocks.filter(b => b.isAllocated).concat(newISOStorage);
+        
+        // Mark ISO storage as created
+        draft.isoStorageCreated = true;
+        
+        // Update history
+        draft.history.push([...draft.blocks]);
       }), true),
     };
   }, []);

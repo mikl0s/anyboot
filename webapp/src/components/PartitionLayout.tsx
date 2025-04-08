@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { produce } from 'immer';
 import {
   FaDatabase,
   FaPlus,
@@ -9,14 +10,22 @@ import {
   FaSpinner,
   FaExclamationTriangle,
   FaTools,
-  FaInfoCircle
+  FaInfoCircle,
+  FaCompress,
+  FaUndo,
+  FaRedo,
+  FaQuestionCircle,
+  FaObjectGroup,
+  FaHdd
 } from 'react-icons/fa';
+import { SiIos } from 'react-icons/si';
 import { Disk, PartitionBlock, formatBytes } from '@/lib/diskUtils';
 import { 
-  usePartitionEditorActions, 
+  usePartitionEditorActions,
   usePartitionEditorState,
   partitionEditorStore 
 } from '@/store/usePartitionEditorStore';
+import PartitionModal, { PartitionFormData } from './PartitionModal';
 
 interface PartitionLayoutProps {
   diskId: string | null;
@@ -24,13 +33,18 @@ interface PartitionLayoutProps {
 
 const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
   // Get values from our stable hooks
-  const { selectedDisk, blocks, isLoading: storeIsLoading, error: storeError } = usePartitionEditorState();
+  const { selectedDisk, blocks, isLoading: storeIsLoading, error } = usePartitionEditorState();
   const partitionActions = usePartitionEditorActions();
   
   // Local component state
   const [isComponentLoading, setIsComponentLoading] = useState(false);
   const processingDiskIdRef = useRef<string | null>(null);
   const effectRunCount = useRef(0);
+
+  // State for partition modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [unallocatedSize, setUnallocatedSize] = useState(0);
 
   // Effect for loading disk data
   useEffect(() => {
@@ -61,6 +75,9 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
               id: targetDisk.name,
               name: `/dev/${targetDisk.name}`,
               model: targetDisk.model || 'Unknown Device',
+              vendor: targetDisk.vendor || 'Unknown',
+              tran: targetDisk.tran || 'Unknown',
+              type: determineDiskType(targetDisk), // Helper function to determine disk type
               size: formatBytes(targetDisk.size),
               sizeBytes: Number(targetDisk.size),
               partitions: (targetDisk.children || []).map((child: any) => {
@@ -83,24 +100,17 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
             
             partitionActions.initializeState(formattedDisk);
           } else {
-            partitionEditorStore.setState({
-              isLoading: false,
-              error: `Disk ${id} not found`,
-              selectedDisk: null,
-              blocks: []
-            }, true);
+            // If disk not found, reset state using the proper store action instead of setState
+            partitionActions.resetState();
+            console.error(`Disk ${id} not found`);
           }
           setIsComponentLoading(false);
         }
       } catch (err) {
         if (!isCancelled) {
           console.error('Error loading disk data:', err);
-          partitionEditorStore.setState({
-            isLoading: false,
-            error: err instanceof Error ? err.message : 'Loading failed',
-            selectedDisk: null,
-            blocks: []
-          }, true);
+          // Handle error by using the proper store action
+          partitionActions.resetState();
           setIsComponentLoading(false);
         }
       }
@@ -115,7 +125,11 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
       if (shouldLoadDisk) {
         setIsComponentLoading(true);
         processingDiskIdRef.current = diskId;
-        partitionEditorStore.setState({ isLoading: true, error: null }, true);
+        // Use partial state update instead of full state replacement with 'true'
+        partitionEditorStore.setState({ 
+          isLoading: true, 
+          error: null
+        });
         loadDiskData(diskId);
       }
     } else {
@@ -129,6 +143,21 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
       isCancelled = true;
     };
   }, [diskId]);
+
+  // Function to check if there are adjacent unallocated blocks that could be merged
+  const hasMergeableUnallocated = () => {
+    if (!blocks) return false;
+    
+    let unallocatedCount = 0;
+    for (let i = 0; i < blocks.length; i++) {
+      if (!blocks[i].isAllocated) {
+        unallocatedCount++;
+        // If there's more than one unallocated block, they can potentially be merged
+        if (unallocatedCount > 1) return true;
+      }
+    }
+    return false;
+  };
 
   // Define color scheme based on partition types
   const getPartitionColor = (block: PartitionBlock, index: number) => {
@@ -208,6 +237,97 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
     );
   };
 
+  // Function to handle opening the add partition modal
+  const handleAddPartition = () => {
+    // Find the first unallocated block
+    const unallocatedBlock = blocks.find(b => !b.isAllocated);
+    if (!unallocatedBlock) return;
+    
+    setUnallocatedSize(unallocatedBlock.sizeBytes);
+    setSelectedBlockId(unallocatedBlock.id);
+    setIsModalOpen(true);
+  };
+  
+  // Function to handle opening the edit partition modal
+  const handleEditPartition = (blockId: string) => {
+    setSelectedBlockId(blockId);
+    setUnallocatedSize(blocks.find(b => b.id === blockId)?.sizeBytes || 0);
+    setIsModalOpen(true);
+  };
+  
+  // Handle saving the partition form data
+  const handleSavePartition = (formData: PartitionFormData) => {
+    const blockToModify = blocks.find(b => b.id === selectedBlockId);
+    if (!blockToModify) return;
+    
+    if (blockToModify.isAllocated) {
+      // We're editing an existing partition
+      partitionEditorStore.setState(produce((draft: any) => {
+        const blockIndex = draft.blocks.findIndex((b: any) => b.id === selectedBlockId);
+        if (blockIndex === -1) return;
+        
+        draft.blocks[blockIndex] = {
+          ...draft.blocks[blockIndex],
+          fsType: formData.fsType,
+          label: formData.label,
+          // Size can't be changed when editing existing partition for simplicity
+        };
+        
+        draft.history.push([...draft.blocks]);
+      }), true);
+    } else {
+      // We're creating a new partition from unallocated space
+      partitionEditorStore.setState(produce((draft: any) => {
+        const blockIndex = draft.blocks.findIndex((b: any) => b.id === selectedBlockId);
+        if (blockIndex === -1) return;
+        
+        const unallocatedBlock = draft.blocks[blockIndex];
+        const newPartitionSizeBytes = formData.sizeBytes;
+        
+        // Create the new partition
+        const newPartition: PartitionBlock = {
+          id: `partition-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          name: formData.label,
+          type: 'part',
+          isAllocated: true,
+          sizeBytes: newPartitionSizeBytes,
+          size: formatBytes(newPartitionSizeBytes),
+          fsType: formData.fsType,
+          label: formData.label,
+          uuid: null,
+          originalId: null,
+        };
+        
+        // If we're not using all the space, we need to create a new unallocated block
+        if (newPartitionSizeBytes < unallocatedBlock.sizeBytes) {
+          const remainingSize = unallocatedBlock.sizeBytes - newPartitionSizeBytes;
+          const newUnallocated: PartitionBlock = {
+            id: `unallocated-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            name: 'Unallocated',
+            type: 'free',
+            isAllocated: false,
+            sizeBytes: remainingSize,
+            size: formatBytes(remainingSize),
+            fsType: null,
+            label: null,
+            uuid: null,
+            originalId: null,
+          };
+          
+          // Replace the unallocated block with the new partition and the remaining space
+          draft.blocks.splice(blockIndex, 1, newPartition, newUnallocated);
+        } else {
+          // We're using all the space, just replace the unallocated block
+          draft.blocks.splice(blockIndex, 1, newPartition);
+        }
+        
+        draft.history.push([...draft.blocks]);
+      }), true);
+    }
+    
+    setIsModalOpen(false);
+  };
+
   // Render loading state
   if (isComponentLoading || storeIsLoading) {
     return (
@@ -221,14 +341,14 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
   }
 
   // Render error state
-  if (storeError) {
+  if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-[#1a1b26] text-white rounded-lg shadow-lg border border-[#f7768e]">
         <div className="flex items-center gap-3 text-[#f7768e] mb-4">
           <FaExclamationTriangle className="text-2xl" />
           <span className="text-lg font-medium">Error Loading Partition Data</span>
         </div>
-        <p className="text-[#a9b1d6]">{storeError}</p>
+        <p className="text-[#a9b1d6]">{error}</p>
       </div>
     );
   }
@@ -262,13 +382,15 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
               {selectedDisk.model || selectedDisk.name} ({selectedDisk.size})
             </span>
           </h2>
-          <p className="text-[#a9b1d6] text-sm mt-1">{selectedDisk.id}</p>
+          <p className="text-xs text-[#a9b1d6]">
+            {selectedDisk.id}
+          </p>
         </div>
         
         <div className="flex gap-2">
           <button 
             className="bg-[#9ece6a] hover:bg-[#9ece6a]/80 text-white px-3 py-2 rounded flex items-center gap-1 text-sm transition-colors"
-            onClick={() => partitionActions.addPartition()}
+            onClick={() => handleAddPartition()}
           >
             <FaPlus size={14} />
             <span>Add</span>
@@ -480,7 +602,7 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
                           )}
                         </>
                       ) : (
-                        'unallocated'
+                        <span className="text-[#565a6e]">unallocated</span>
                       )}
                     </div>
                   </div>
@@ -494,14 +616,14 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
                   {block.isAllocated ? (
                     <>
                       <button 
-                        className="p-1.5 text-[#7aa2f7] hover:bg-[#3d59a1]/30 rounded"
-                        onClick={() => partitionActions.editPartition(block.id)}
-                        title="Edit partition"
+                        className="p-1.5 text-[#7aa2f7] hover:bg-[#3d59a1]/30 rounded-md transition-colors"
+                        onClick={() => handleEditPartition(block.id)}
+                        title="Change partition filesystem type"
                       >
                         <FaEdit size={16} />
                       </button>
                       <button 
-                        className="p-1.5 text-[#f7768e] hover:bg-[#f7768e]/20 rounded"
+                        className="p-1.5 text-[#f7768e] hover:bg-[#f7768e]/20 rounded-md transition-colors"
                         onClick={() => partitionActions.deletePartition(block.id)}
                         title="Delete partition"
                       >
@@ -510,8 +632,8 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
                     </>
                   ) : (
                     <button 
-                      className="p-1.5 text-[#9ece6a] hover:bg-[#9ece6a]/20 rounded"
-                      onClick={() => partitionActions.addPartition()}
+                      className="p-1.5 text-[#9ece6a] hover:bg-[#9ece6a]/20 rounded-md transition-colors"
+                      onClick={() => handleAddPartition()}
                       title="Create partition in unallocated space"
                     >
                       <FaPlus size={16} />
@@ -523,8 +645,80 @@ const PartitionLayout: React.FC<PartitionLayoutProps> = ({ diskId }) => {
           </div>
         </div>
       </div>
+      
+      {/* Partition management actions */}
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-[#c0caf5]">Partitions</h3>
+        <div className="flex gap-2">
+          {hasMergeableUnallocated() && (
+            <button
+              onClick={() => partitionActions.mergeUnallocated()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#3d59a1]/30 hover:bg-[#3d59a1]/50 text-[#7aa2f7] rounded-md transition-all"
+              title="Merge adjacent unallocated partitions"
+            >
+              <FaCompress size={14} /> <span className="text-sm">Merge Free Space</span>
+            </button>
+          )}
+          <button
+            onClick={() => handleAddPartition()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9ece6a]/20 hover:bg-[#9ece6a]/30 text-[#9ece6a] rounded-md transition-all"
+            disabled={!blocks.some(b => !b.isAllocated)}
+            title="Create a new partition in unallocated space"
+          >
+            <FaPlus size={14} /> <span className="text-sm">New Partition</span>
+          </button>
+
+          {/* Auto Create ISO Storage Partition button */}
+          <button
+            onClick={() => partitionActions.createISOStoragePartition()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f7768e]/20 hover:bg-[#f7768e]/30 text-[#f7768e] rounded-md transition-all"
+            disabled={!blocks.some(b => !b.isAllocated)}
+            title="Auto-create ISO storage partition using all available space (exFAT)"
+          >
+            <SiIos size={14} /> <span className="text-sm">Create ISO Storage</span>
+          </button>
+        </div>
+      </div>
+      
+      {/* Partition Modal */}
+      <PartitionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSavePartition}
+        block={selectedBlockId ? blocks.find(b => b.id === selectedBlockId) : undefined}
+        maxSizeBytes={unallocatedSize}
+      />
     </div>
   );
+};
+
+// Helper function to determine disk type
+const determineDiskType = (disk: any): 'SSD' | 'HDD' | 'NVMe' | 'Unknown' => {
+  if (!disk) return 'Unknown';
+  
+  // Check for NVMe first based on transport or name pattern
+  if ((disk.tran && disk.tran.toLowerCase() === 'nvme') || 
+      (disk.name && disk.name.startsWith('nvme'))) {
+    return 'NVMe';
+  }
+  
+  // Check for SSD based on rotation rate (0 typically means SSD)
+  if (disk.rota === '0') {
+    return 'SSD';
+  }
+  
+  // If it rotates, it's likely a HDD
+  if (disk.rota === '1') {
+    return 'HDD';
+  }
+  
+  // Fall back to examining the model name for common SSD indicators
+  const modelLower = (disk.model || '').toLowerCase();
+  if (modelLower.includes('ssd') || modelLower.includes('solid') || modelLower.includes('flash')) {
+    return 'SSD';
+  }
+  
+  return 'Unknown';
 };
 
 export default PartitionLayout;

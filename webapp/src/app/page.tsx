@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FaServer, FaShieldAlt, FaProjectDiagram, FaLaptop, FaHdd } from 'react-icons/fa';
+import { FaServer, FaShieldAlt, FaProjectDiagram, FaLaptop, FaHdd, FaDownload } from 'react-icons/fa';
 import { useWizardStore } from '@/store/wizardStore';
+import FileBrowser from '@/components/FileBrowser';
 
 export default function Home() {
   // System checks - would be derived from real checks in a production app
@@ -23,9 +24,9 @@ export default function Home() {
     <div className="max-w-6xl mx-auto px-6">
       {/* Main Panel */}
       <div className="mb-10 p-8 bg-[#1f2335] rounded-xl border border-[#292e42] shadow-lg">
-        <h1 className="text-3xl font-bold mb-2 text-white">AnyBoot</h1>
+        <h1 className="text-3xl font-bold mb-2 text-white">Welcome to Your Bootable Drive Creator</h1>
         <p className="text-[#a9b1d6] mb-6">
-          Bootable drive creation utility
+          Create multi-boot USB drives with ease
         </p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -55,6 +56,17 @@ export default function Home() {
                   <span className="text-sm text-[#a9b1d6]">Continue from a saved configuration</span>
                 </div>
               </button>
+
+              <button 
+                className="flex items-center px-4 py-3 bg-[#24283b] hover:bg-[#292e42] rounded-lg border border-[#292e42] transition-colors">
+                <div className="mr-3 p-2 rounded-lg bg-[#f7768e]/10 text-[#f7768e]">
+                  <FaDownload size={20} />
+                </div>
+                <div>
+                  <span className="block text-white font-medium">Download OS Images</span>
+                  <span className="text-sm text-[#a9b1d6]">Get Linux, Windows or other OS images</span>
+                </div>
+              </button>
             </div>
           </div>
           
@@ -76,6 +88,37 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </div>
+      
+      {/* ISO Storage Panel */}
+      <div className="mb-10">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-[#c0caf5]">ISO Storage</h2>
+          <div className="bg-[#24283b] px-3 py-1 rounded-lg border border-[#292e42]">
+            <span className="text-xs text-[#9ece6a] font-medium">Auto-created on first boot</span>
+          </div>
+        </div>
+        
+        <div className="bg-[#1f2335] rounded-xl border border-[#292e42] p-6 mb-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-lg bg-[#f7768e]/10 text-[#f7768e]">
+              <FaHdd size={24} />
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-[#c0caf5] mb-1">exFAT ISO Storage Partition</h3>
+              <p className="text-[#a9b1d6] mb-3">
+                This utility automatically creates an exFAT partition that uses all available space on your device for storing ISO files.
+              </p>
+              <div className="flex gap-2">
+                <span className="px-2 py-0.5 text-xs bg-[#24283b] text-[#7aa2f7] rounded">exFAT Filesystem</span>
+                <span className="px-2 py-0.5 text-xs bg-[#24283b] text-[#e0af68] rounded">Maximum Available Space</span>
+                <span className="px-2 py-0.5 text-xs bg-[#24283b] text-[#9ece6a] rounded">Auto-mounted</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <FileBrowser files={[]} />
       </div>
       
       {/* Device Panel */}
