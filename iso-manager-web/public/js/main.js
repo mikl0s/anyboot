@@ -340,12 +340,14 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
     var actionText = 'Click to Download';
     var actionClass = 'download';
     var actionHandler = this.downloadHandler;
+    var buttonColorClass = 'bg-primary-600 hover:bg-primary-700';
     
     if (iso.inArchive) {
-      badgeHtml = '<span class="badge badge-archive">In Archive</span>';
-      actionText = 'Click to Verify';
+      // Remove the In Archive badge and change the button instead
+      actionText = 'In archive - click to verify';
       actionClass = 'verify';
       actionHandler = this.verifyHandler;
+      buttonColorClass = 'bg-accent3-500 hover:bg-accent3-600'; // Green button for archived ISOs
       
       if (iso.updateAvailable) {
         badgeHtml += '<span class="badge badge-update">Update Available</span>';
@@ -380,7 +382,7 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
         ${badgeHtml}
         <div class="flex-grow"></div>
         <div class="mt-4">
-          <button class="${actionClass}-button w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center">
+          <button class="${actionClass}-button w-full ${buttonColorClass} text-white font-bold py-2 px-4 rounded flex items-center justify-center">
             <i class="fas fa-${actionClass === 'download' ? 'download' : 'check-circle'} mr-2"></i>
             <span>${actionText}</span>
           </button>
@@ -500,8 +502,8 @@ IsoManagerApp.prototype.init = function() {
     // Load ISO list
     this.loadIsoList();
     
-    // Show success toast
-    this.ui.showToast('Application initialized successfully', 'success');
+    // Show success toast that auto-disappears
+    this.ui.showToast('Application initialized successfully', 'success', 3000, false);
   } catch (error) {
     console.error('Error initializing application:', error);
     this.isoGrid.showError(`Failed to initialize application: ${error.message}`);
