@@ -261,26 +261,20 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
                 <i class="fas fa-tag mr-1"></i>
                 <span>${versionDisplay}</span>
               </div>
-              <div class="text-sm text-gray-400 flex items-center">
-                <i class="fas fa-file-archive mr-1"></i>
-                <span>${sizeFormatted}</span>
-              </div>
+              ${badgeHtml} <!-- Display badge next to version if it exists -->
             </div>
           </div>
         </div>
-        ${badgeHtml}
-        <div class="flex-grow"></div>
-        <div class="mt-4 pt-4 border-t border-dark-600 flex justify-between items-center text-sm">
-          <span class="iso-size text-gray-400">${sizeFormatted}</span>
-          <div class="flex items-center space-x-2"> <!-- Container for buttons -->
-            <button class="${actionClass}-button ${buttonColorClass} text-white font-bold py-1 px-3 rounded text-xs flex items-center justify-center">
-              <i class="fas fa-${actionClass === 'download' ? 'download' : 'check-circle'} mr-1.5"></i>
-              <span>${actionText}</span>
-            </button>
-            <button class="delete-iso-button text-red-500 hover:text-red-400 transition-colors duration-200 hidden p-1 rounded" title="Delete Downloaded ISO">
-              <i class="fas fa-trash-alt text-sm"></i>
-            </button>
-          </div>
+        <div class="flex-grow"></div> <!-- Spacer -->
+        <!-- Bottom section -->
+        <div class="mt-4 flex items-center"> 
+          <button class="${actionClass}-button ${buttonColorClass} text-white font-bold py-2 px-4 rounded flex items-center justify-center flex-grow mr-2"> 
+            <i class="fas fa-${actionClass === 'download' ? 'download' : 'check-circle'} mr-2"></i>
+            <span>${actionText}</span>
+          </button>
+          <button class="delete-iso-button text-red-500 hover:text-red-400 transition-colors duration-200 hidden p-1 rounded" title="Delete Downloaded ISO">
+            <i class="fas fa-trash-alt text-sm"></i>
+          </button>
         </div>
       </div>
     `;
