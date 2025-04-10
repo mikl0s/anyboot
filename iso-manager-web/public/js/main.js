@@ -270,23 +270,63 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
         </div>
         ${badgeHtml}
         <div class="flex-grow"></div>
-        <div class="mt-4">
-          <button class="${actionClass}-button w-full ${buttonColorClass} text-white font-bold py-2 px-4 rounded flex items-center justify-center">
-            <i class="fas fa-${actionClass === 'download' ? 'download' : 'check-circle'} mr-2"></i>
-            <span>${actionText}</span>
-          </button>
+        <div class="mt-4 pt-4 border-t border-dark-600 flex justify-between items-center text-sm">
+          <span class="iso-size text-gray-400">${sizeFormatted}</span>
+          <div class="flex items-center space-x-2"> <!-- Container for buttons -->
+            <button class="${actionClass}-button ${buttonColorClass} text-white font-bold py-1 px-3 rounded text-xs flex items-center justify-center">
+              <i class="fas fa-${actionClass === 'download' ? 'download' : 'check-circle'} mr-1.5"></i>
+              <span>${actionText}</span>
+            </button>
+            <button class="delete-iso-button text-red-500 hover:text-red-400 transition-colors duration-200 hidden p-1 rounded" title="Delete Downloaded ISO">
+              <i class="fas fa-trash-alt text-sm"></i>
+            </button>
+          </div>
         </div>
       </div>
     `;
     
-    // Add event listener
-    var button = card.querySelector(`.${actionClass}-button`);
-    if (button) {
-      button.addEventListener('click', function() {
-        actionHandler(iso);
-      });
+    // --- Button Visibility & Event Listeners ---
+    const actionButton = card.querySelector(`.${actionClass}-button`); // Main button (Download/Verify)
+    const deleteButton = card.querySelector('.delete-iso-button'); // Trashcan icon button
+
+    // Set visibility for delete button based on download state
+    if (actionClass === 'verify') {
+        deleteButton.classList.remove('hidden'); // Show trashcan when Verify is shown
+    } else {
+       deleteButton.classList.add('hidden');
     }
-    
+
+    // Add listener to the delete button
+    if (deleteButton) {
+        // Prevent duplicate listeners if card is updated later
+        if (!deleteButton.dataset.listenerAttached) { 
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent card click
+                const filename = card.dataset.isoFilename; // Get filename from card data
+                if (filename && confirm(`Are you sure you want to delete the downloaded file '${filename}'? This cannot be undone.`)) {
+                    this.deleteIsoFile(filename, card); // Pass filename and card element
+                }
+            });
+            deleteButton.dataset.listenerAttached = 'true'; // Mark as attached
+        }
+    }
+
+    // Add listener to the main action button
+    if (actionButton) {
+        actionButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cardElement = e.target.closest('.iso-card');
+            if (!cardElement) return;
+            const isoName = cardElement.dataset.isoId;
+            const isoObject = this.state.isoList.find(item => item.name === isoName);
+            if (isoObject) {
+                actionHandler.call(this, isoObject);
+            } else {
+                console.error("Could not find ISO object for action button:", isoName);
+            }
+        });
+    }
+
     // Check if title needs scrolling animation
     const titleElement = card.querySelector('.scrolling-title');
     const titleContainer = card.querySelector('.title-container');
@@ -295,7 +335,7 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
       // We'll check after it's been added to the DOM
       card.dataset.checkScrolling = 'true';
     }
-    
+
     return card;
   };
   
@@ -364,7 +404,8 @@ function IsoManagerApp() {
     isoListUrl: null,
     activeDownloads: new Map(),
     osMapping: {},
-    config: {}
+    config: {},
+    downloadedIsoFiles: [] // Holds filenames of ISOs present in the archive
   };
   
   // Load OS list mapping
@@ -375,6 +416,12 @@ function IsoManagerApp() {
     console.error('Failed to load OS mapping:', error);
   });
   
+  // Fetch server configuration
+  this.fetchServerStatus();
+  
+  // Fetch initially downloaded files
+  this.fetchDownloadedIsos();
+  
   // Initialize the application
   this.init();
 }
@@ -383,9 +430,6 @@ IsoManagerApp.prototype.init = function() {
   try {
     // Show loading state
     this.isoGrid.showLoading('Initializing application...');
-    
-    // Fetch server status
-    this.fetchServerStatus();
     
     // Set up event listeners
     this.setupEventListeners();
@@ -412,9 +456,7 @@ IsoManagerApp.prototype.setupEventListeners = function() {
   var settingsButton = document.getElementById('settingsBtn');
   if (settingsButton) {
     settingsButton.addEventListener('click', function() {
-      // TODO: Implement settings modal/view
-      alert('Settings button clicked! Functionality to be implemented.');
-      // Example: this.ui.showSettingsModal(this.state.config);
+      this.showSettingsModal();
     }.bind(this));
   }
 
@@ -443,12 +485,39 @@ IsoManagerApp.prototype.setupEventListeners = function() {
       }
     }.bind(this));
   }
+
+  // Settings Modal Buttons
+  const closeBtn = document.getElementById('closeSettingsModalBtn');
+  const cancelBtn = document.getElementById('cancelSettingsBtn');
+  const saveBtn = document.getElementById('saveSettingsBtn');
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => this.hideSettingsModal());
+  }
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => this.hideSettingsModal());
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => this.saveSettings());
+  }
+  
+  // Clicking outside the modal content (on the backdrop) to close
+  const settingsModal = document.getElementById('settingsModal');
+  if (settingsModal) {
+      settingsModal.addEventListener('click', (event) => {
+          // Check if the click is directly on the backdrop
+          if (event.target === settingsModal) {
+              this.hideSettingsModal();
+          }
+      });
+  }
 };
 
 IsoManagerApp.prototype.fetchServerStatus = function() {
   var self = this;
   
   // Fetch server status and configuration
+  console.log('Fetching server configuration...');
   fetch('/api/config')
     .then(function(response) {
       if (!response.ok) {
@@ -459,9 +528,15 @@ IsoManagerApp.prototype.fetchServerStatus = function() {
     .then(function(data) {
       console.log('Server configuration:', data);
       self.state.config = data;
+      // Update state that might depend on config, like isoListUrl
+      if (data.isoListUrl && !self.state.isoListUrl) {
+        self.state.isoListUrl = data.isoListUrl;
+        console.log('Setting initial ISO list URL from config:', self.state.isoListUrl);
+      }
     })
     .catch(function(error) {
-      console.error('Error fetching server status:', error);
+      console.error('Error fetching server config:', error);
+      self.ui.createToast({ message: `Failed to load server configuration: ${error.message}`, type: 'error' });
     });
 };
 
@@ -474,9 +549,14 @@ IsoManagerApp.prototype.loadIsoList = function(forceRefresh, url) {
     // Determine URL to use
     var isoListUrl = url || 
       this.state.isoListUrl || 
-      (this.state.serverStatus && this.state.serverStatus.defaultIsoListUrl) ||
+      (this.state.config && this.state.config.isoListUrl) || // Use fetched config value
       'https://raw.githubusercontent.com/mikl0s/iso-list/main/links.json'; // Default fallback URL
     
+    // Ensure state reflects the URL being used
+    if (isoListUrl !== this.state.isoListUrl) {
+       this.state.isoListUrl = isoListUrl;
+    }
+
     console.log(`Loading ISO list from ${isoListUrl}`);
     
     // Fetch ISO list
@@ -510,7 +590,6 @@ IsoManagerApp.prototype.loadIsoList = function(forceRefresh, url) {
         
         // Update state
         self.state.isoList = isoList;
-        self.state.isoListUrl = isoListUrl;
         
         // Update ISO grid
         self.isoGrid.loadIsos(isoList);
@@ -765,8 +844,8 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
     })
     .then(response => {
       if (!response.ok) {
-        return response.text().then(text => {
-          let errorMessage = `Server returned ${response.status}: ${response.statusText}`;
+        return response.text().then(text => { 
+          let errorMessage = `Server error ${response.status}: ${text || response.statusText}`; 
           try {
             const errorJson = JSON.parse(text);
             errorMessage = errorJson.error || errorMessage;
@@ -820,6 +899,98 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
   }
 };
 
+IsoManagerApp.prototype.showSettingsModal = function() {
+  const modal = document.getElementById('settingsModal');
+  const urlInput = document.getElementById('settingsIsoListUrlInput');
+  const downloadPathInput = document.getElementById('settingsDefaultDownloadPathInput');
+  // Add other inputs like hash algo, auto verify when implemented
+
+  if (modal && urlInput && downloadPathInput) {
+    // Populate with current state/config
+    urlInput.value = this.state.isoListUrl || '';
+    downloadPathInput.value = this.state.config?.defaultDownloadPath || '';
+    // Populate other fields...
+
+    modal.classList.remove('hidden');
+  } else {
+    console.error('Settings modal elements not found!');
+    this.ui.createToast({ message: 'Could not open settings.', type: 'error' });
+  }
+};
+
+IsoManagerApp.prototype.hideSettingsModal = function() {
+  const modal = document.getElementById('settingsModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+};
+
+IsoManagerApp.prototype.saveSettings = function() {
+  const newUrl = document.getElementById('settingsIsoListUrlInput').value.trim();
+  const newDownloadPath = document.getElementById('settingsDefaultDownloadPathInput').value.trim();
+  // Get other settings values here when implemented
+
+  const settingsPayload = {
+      // Only include settings that are meant to be saved
+      ...(newUrl && { isoListUrl: newUrl }),
+      ...(newDownloadPath && { defaultDownloadPath: newDownloadPath }),
+      // Add other settings to payload when implemented
+      // defaultHashAlgorithm: ..., 
+      // autoVerify: ... 
+  };
+
+  // Check if there's anything to save
+  if (Object.keys(settingsPayload).length === 0) {
+     this.ui.createToast({ message: 'No settings changed.', type: 'info', autoClose: true, autoCloseDelay: 2000 });
+     this.hideSettingsModal();
+     return;
+  }
+  
+  console.log('Attempting to save settings:', settingsPayload);
+
+  // Send updated settings to the backend
+  fetch('/api/config', {
+      method: 'POST', // Or PUT, depending on backend implementation
+      headers: {
+          'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(settingsPayload),
+  })
+  .then(response => {
+      if (!response.ok) {
+          // Try to get error message from backend response body
+          return response.text().then(text => { 
+              throw new Error(`Server error ${response.status}: ${text || response.statusText}`); 
+          });
+      }
+      return response.json(); // Assuming backend returns updated config or success message
+  })
+  .then(updatedConfig => {
+      console.log('Settings saved successfully:', updatedConfig);
+      this.ui.createToast({ message: 'Settings saved successfully!', type: 'success', autoClose: true, autoCloseDelay: 3000 });
+      
+      // Update local state with potentially confirmed/updated values from backend
+      this.state.config = { ...this.state.config, ...updatedConfig }; 
+      if (updatedConfig.isoListUrl) {
+          this.state.isoListUrl = updatedConfig.isoListUrl;
+          // Reload ISO list only if the URL actually changed and was saved
+          if (newUrl && newUrl !== this.state.isoListUrl) {
+              console.log('Reloading ISO list due to URL change.');
+              this.loadIsoList(true, newUrl);
+          } else {
+              console.log('ISO List URL confirmed, no reload needed.');
+          }
+      }
+      this.hideSettingsModal();
+  })
+  .catch(error => {
+      console.error('Error saving settings:', error);
+      this.ui.createToast({ message: `Failed to save settings: ${error.message}`, type: 'error', autoClose: false });
+      // Optionally, don't hide the modal on error
+  });
+
+};
+
 IsoManagerApp.prototype.filterIsoList = function() {
   const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
   const isoGridContainer = document.getElementById('isoGrid');
@@ -854,6 +1025,138 @@ IsoManagerApp.prototype.filterIsoList = function() {
       emptyState.classList.add('hidden');
     }
   }
+};
+
+IsoManagerApp.prototype.fetchDownloadedIsos = function() {
+  console.log("Fetching list of downloaded ISOs...");
+  fetch('/api/iso-archive')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(filenames => {
+      console.log("Downloaded ISOs found:", filenames);
+      this.state.downloadedIsoFiles = filenames;
+      // Re-render or update cards if necessary after fetching
+      // This might be complex depending on how rendering is handled.
+      // For now, we assume cards are created *after* this fetch completes or
+      // that createIsoCard will be called again when needed.
+      // If cards are already rendered, we might need to iterate them:
+       this.updateExistingCardDeleteButtons(); 
+    })
+    .catch(error => {
+      console.error('Error fetching downloaded ISO list:', error);
+      this.ui.createToast({ message: 'Failed to get list of downloaded ISOs.', type: 'error' });
+      this.state.downloadedIsoFiles = []; // Ensure it's empty on error
+    });
+};
+
+IsoManagerApp.prototype.updateExistingCardDeleteButtons = function() {
+    const isoGridContainer = document.getElementById('isoGrid');
+    if (!isoGridContainer) return;
+    const cards = isoGridContainer.querySelectorAll('.iso-card');
+    cards.forEach(card => {
+        const deleteButton = card.querySelector('.delete-iso-button');
+        const filename = card.dataset.isoFilename;
+        if (deleteButton && filename) {
+            if (this.state.downloadedIsoFiles.includes(filename)) {
+                deleteButton.classList.remove('hidden');
+                // Ensure listener is attached (might need removal first if re-attaching)
+                 // Check if listener already exists to prevent duplicates
+                if (!deleteButton.dataset.listenerAttached) {
+                    deleteButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Are you sure you want to delete the file '${filename}'? This cannot be undone.`)) {
+                            this.deleteIsoFile(filename, card);
+                        }
+                    });
+                    deleteButton.dataset.listenerAttached = 'true'; // Mark as attached
+                }
+            } else {
+                deleteButton.classList.add('hidden');
+                 // Optionally remove listener if hiding?
+                 // For simplicity, we might leave it, but ideally, it would be removed.
+            }
+        }
+    });
+};
+
+IsoManagerApp.prototype.deleteIsoFile = function(filename, cardElement) {
+  if (!filename) {
+    console.error("Delete attempt failed: filename is missing.");
+    return;
+  }
+  console.log(`Attempting to delete ISO file: ${filename}`);
+  this.ui.createToast({ message: `Deleting ${filename}...`, type: 'info', autoClose: false });
+
+  fetch(`/api/iso-archive/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+  })
+  .then(response => {
+    this.ui.closeAllToasts(); // Close the 'deleting...' toast
+    if (!response.ok) {
+      return response.json().then(errData => {
+        throw new Error(errData.error || `Server error ${response.status}`);
+      }).catch(() => {
+        throw new Error(`Server error ${response.status}`); // Fallback if no JSON error body
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('Delete successful:', data.message);
+    this.ui.createToast({ message: `'${filename}' deleted successfully.`, type: 'success', autoClose: true, autoCloseDelay: 4000 });
+
+    // Update state
+    this.state.downloadedIsoFiles = this.state.downloadedIsoFiles.filter(f => f !== filename);
+
+    // Update UI for the specific card
+    if (cardElement) {
+      const deleteButton = cardElement.querySelector('.delete-iso-button');
+      if (deleteButton) {
+        deleteButton.classList.add('hidden');
+        deleteButton.dataset.listenerAttached = 'false'; // Reset marker
+      }
+      // Change the main button back to 'Download'
+      const actionButton = cardElement.querySelector('.verify-button'); // Find the verify button specifically
+      if (actionButton) {
+        const isoName = cardElement.dataset.isoId;
+        const isoObject = this.state.isoList.find(item => item.name === isoName);
+        if (isoObject) {
+          // Change classes, icon, text
+          actionButton.classList.remove('verify-button', 'bg-accent3-500', 'hover:bg-accent3-600');
+          actionButton.classList.add('download-button', 'bg-primary-600', 'hover:bg-primary-700');
+          actionButton.querySelector('i').className = 'fas fa-download mr-1.5'; // Update icon
+          actionButton.querySelector('span').textContent = 'Download'; // Update text
+
+          // Replace listener to point to the download handler
+          this.replaceButtonListener(actionButton, this.handleDownloadRequest, isoObject);
+        } else {
+          console.warn("Could not find ISO object to reset action button after delete for:", isoName);
+        }
+      }
+      // Refresh list or specific card state? For now, just hide button.
+
+    }
+    // Refresh list or specific card state? For now, just hide button.
+
+  })
+  .catch(error => {
+    this.ui.closeAllToasts();
+    console.error('Error deleting ISO file:', error);
+    this.ui.createToast({ message: `Error deleting file: ${error.message}`, type: 'error', autoClose: false });
+  });
+};
+
+IsoManagerApp.prototype.replaceButtonListener = function(button, newHandler, isoObject) {
+    const newButton = button.cloneNode(true);
+    button.parentNode.replaceChild(newButton, button);
+    newButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        newHandler.call(this, isoObject);
+    });
 };
 
 // Initialize application when DOM is loaded

@@ -159,5 +159,43 @@
     <script type="module" src="/js/ui.js"></script>
     <script type="module" src="/js/main.js"></script>
 
+<!-- Settings Modal -->
+<div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-dark-800 rounded-lg border border-gray-700 p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-semibold">ISO Manager Settings</h2>
+            <button id="closeSettingsModalBtn" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label for="settingsIsoListUrlInput" class="block text-gray-300 mb-1 text-sm font-medium">ISO List Source URL</label>
+                <input type="text" id="settingsIsoListUrlInput" placeholder="https://example.com/links.json" class="w-full bg-dark-900 text-white px-3 py-2 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500">
+            </div>
+
+            <div>
+                <label for="settingsDefaultDownloadPathInput" class="block text-gray-300 mb-1 text-sm font-medium">Default Download Directory</label>
+                <div class="flex">
+                    <input type="text" id="settingsDefaultDownloadPathInput" placeholder="Enter path on server" class="w-full bg-dark-900 text-white px-3 py-2 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+            </div>
+
+             <div class="flex items-center">
+                 <input type="checkbox" id="settingsAutoVerifyCheckbox" class="form-checkbox h-4 w-4 text-primary-500 rounded focus:ring-primary-500 border-gray-700 bg-dark-900 opacity-50 cursor-not-allowed" disabled> <!-- Disabled for now -->
+                 <label for="settingsAutoVerifyCheckbox" class="ml-2 text-gray-300 text-sm">Always verify downloads</label>
+             </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-gray-700 flex justify-end space-x-3">
+            <button id="cancelSettingsBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-all duration-200">
+                Cancel
+            </button>
+            <button id="saveSettingsBtn" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md transition-all duration-200">
+                Save Settings
+            </button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

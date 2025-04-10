@@ -268,21 +268,75 @@ app.get('/api/archive', async (req, res) => {
   }
 });
 
+// Function to read and parse iso-manager.conf (JSON format)
+function readJsonConfig(filePath) {
+  try {
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const config = JSON.parse(fileContent);
+    return config;
+  } catch (error) {
+    console.error(`Error reading or parsing JSON config file ${filePath}:`, error);
+    // Return empty object or handle error as needed
+    return {}; 
+  }
+}
+
 // API endpoint to get configuration
 app.get('/api/config', (req, res) => {
+  const configPath = path.join(__dirname, '../iso-manager/iso-manager.conf');
   try {
-    // Only send the necessary config options to the client
-    const clientConfig = {
-      defaultIsoListUrl: config.defaultIsoListUrl,
-      isoArchive: config.isoArchive,
-      autoVerifyHashes: config.autoVerifyHashes || true,
-      hashAlgorithm: config.hashAlgorithm || 'sha256'
-    };
+    const config = readJsonConfig(configPath);
     
-    res.json(clientConfig);
+    // Send only the relevant config values needed by the frontend
+    const frontendConfig = {
+      isoListUrl: config.defaultIsoListUrl, 
+      defaultDownloadPath: config.isoArchive // Use the 'isoArchive' key from the JSON config
+      // Add other needed config keys here
+    };
+
+    console.log("Sending config to frontend:", frontendConfig);
+    res.json(frontendConfig);
   } catch (error) {
-    logger.error(`Error getting config: ${error.message}`);
-    res.status(500).json({ error: error.message });
+    console.error("Error processing GET /api/config:", error);
+    res.status(500).json({ error: 'Failed to retrieve configuration.' });
+  }
+});
+
+// API endpoint to update configuration
+app.post('/api/config', (req, res) => {
+  const configPath = path.join(__dirname, '../iso-manager/iso-manager.conf');
+  const newSettings = req.body;
+  console.log("Received settings to save:", newSettings);
+
+  try {
+    // Read the current config
+    let currentConfig = readJsonConfig(configPath);
+    if (!currentConfig) {
+      throw new Error('Could not read current configuration.');
+    }
+
+    // Update the config with new values (if provided)
+    if (newSettings.hasOwnProperty('isoListUrl')) {
+      currentConfig.defaultIsoListUrl = newSettings.isoListUrl;
+    }
+    if (newSettings.hasOwnProperty('defaultDownloadPath')) {
+      currentConfig.isoArchive = newSettings.defaultDownloadPath;
+    }
+    // Add updates for other settings here if needed
+
+    // Write the updated config back to the file (pretty-printed JSON)
+    fs.writeFileSync(configPath, JSON.stringify(currentConfig, null, 2), 'utf8');
+    console.log("Configuration saved successfully to:", configPath);
+
+    // Send back the updated relevant config (optional, but good practice)
+    const updatedFrontendConfig = {
+      isoListUrl: currentConfig.defaultIsoListUrl, 
+      defaultDownloadPath: currentConfig.isoArchive 
+    };
+    res.json(updatedFrontendConfig);
+  } catch (error) {
+    console.error("Error saving configuration:", error);
+    res.status(500).json({ error: `Failed to save configuration: ${error.message}` });
   }
 });
 
@@ -518,6 +572,76 @@ watcher
   .on('change', path => console.log(`File changed in archive: ${path}`))
   .on('unlink', path => console.log(`File removed from archive: ${path}`))
   .on('error', error => console.error(`Watcher error: ${error}`));
+
+// API endpoint to list downloaded ISOs
+app.get('/api/iso-archive', (req, res) => {
+  const configPath = path.join(__dirname, '../iso-manager/iso-manager.conf');
+  try {
+    const config = readJsonConfig(configPath);
+    const archivePath = config.isoArchive; // Get archive path from config
+    if (!archivePath || !fs.existsSync(archivePath)) {
+      console.warn(`ISO Archive path not found or doesn't exist: ${archivePath}`);
+      return res.json([]); // Return empty array if path is invalid
+    }
+
+    fs.readdir(archivePath, (err, files) => {
+      if (err) {
+        console.error(`Error reading archive directory ${archivePath}:`, err);
+        return res.status(500).json({ error: 'Failed to read ISO archive directory.' });
+      }
+      // Filter out potential subdirectories or non-ISO files if needed (optional)
+      const isoFiles = files.filter(file => !fs.statSync(path.join(archivePath, file)).isDirectory()); 
+      res.json(isoFiles);
+    });
+  } catch (error) {
+    console.error("Error processing GET /api/iso-archive:", error);
+    res.status(500).json({ error: 'Failed to list ISO archive files.' });
+  }
+});
+
+// API endpoint to delete a downloaded ISO
+app.delete('/api/iso-archive/:filename', (req, res) => {
+  const configPath = path.join(__dirname, '../iso-manager/iso-manager.conf');
+  const filenameToDelete = req.params.filename;
+
+  if (!filenameToDelete) {
+    return res.status(400).json({ error: 'Filename is required.' });
+  }
+
+  try {
+    const config = readJsonConfig(configPath);
+    const archivePath = config.isoArchive; 
+
+    if (!archivePath) {
+      throw new Error('ISO Archive path is not configured.');
+    }
+
+    const fullPathToDelete = path.resolve(archivePath, filenameToDelete);
+    const resolvedArchivePath = path.resolve(archivePath);
+
+    // **Security Check:** Ensure the path to delete is within the archive directory
+    if (!fullPathToDelete.startsWith(resolvedArchivePath + path.sep)) {
+      console.error(`Attempted deletion outside archive directory: ${fullPathToDelete}`);
+      return res.status(403).json({ error: 'Deletion outside designated directory is forbidden.' });
+    }
+
+    if (!fs.existsSync(fullPathToDelete)) {
+      return res.status(404).json({ error: `File not found: ${filenameToDelete}` });
+    }
+
+    fs.unlink(fullPathToDelete, (err) => {
+      if (err) {
+        console.error(`Error deleting file ${fullPathToDelete}:`, err);
+        return res.status(500).json({ error: `Failed to delete file: ${err.message}` });
+      }
+      console.log(`Successfully deleted: ${fullPathToDelete}`);
+      res.status(200).json({ message: `File '${filenameToDelete}' deleted successfully.` });
+    });
+  } catch (error) {
+    console.error("Error processing DELETE /api/iso-archive:", error);
+    res.status(500).json({ error: `Failed to delete file: ${error.message}` });
+  }
+});
 
 // Default route
 app.get('/', (req, res) => {
