@@ -28,14 +28,14 @@ function loadConfiguration() {
       console.warn('Configuration file not found, using defaults');
       return {
         defaultIsoListUrl: 'https://raw.githubusercontent.com/mikl0s/iso-list/main/links.json',
-        isoArchive: '/home/mikkel/repos/anyboot/iso-manager/ISO-Archive'
+        isoArchive: path.join(__dirname, '..', 'iso-manager', 'ISO-Archive')
       };
     }
   } catch (error) {
     console.error('Error loading configuration:', error);
     return {
       defaultIsoListUrl: 'https://raw.githubusercontent.com/mikl0s/iso-list/main/links.json',
-      isoArchive: '/home/mikkel/repos/anyboot/iso-manager/ISO-Archive'
+      isoArchive: path.join(__dirname, '..', 'iso-manager', 'ISO-Archive')
     };
   }
 }

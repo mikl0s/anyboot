@@ -269,6 +269,10 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
                 <i class="fas fa-tag mr-1"></i>
                 <span>${versionDisplay}</span>
               </div>
+              <div class="text-sm text-gray-400 flex items-center">
+                <i class="fas fa-hdd mr-1"></i>
+                <span>${this.formatSize(iso.size || 0)}</span>
+              </div>
               ${badgeHtml} <!-- Display badge next to version if it exists -->
             </div>
           </div>
@@ -302,12 +306,8 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
     if (deleteButton) {
         // Prevent duplicate listeners if card is updated later
         if (!deleteButton.dataset.listenerAttached) { 
-            deleteButton.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent card click
-                const filename = card.dataset.isoFilename; // Get filename from card data
-                if (filename) {
-                    this.deleteHandler(filename, card); // Pass filename and card element
-                }
+            deleteButton.addEventListener('click', function() {
+                window.app.deleteIsoFile(card.dataset.isoFilename, card);
             });
             deleteButton.dataset.listenerAttached = 'true'; // Mark as attached
         }
@@ -1050,7 +1050,7 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
 
     // Check if the ISO has a path property
     if (!iso.path) {
-      const archivePath = self.state.config.isoArchive || '/home/mikkel/repos/anyboot/iso-manager/ISO-Archive';
+      const archivePath = self.state.config.isoArchive || '../iso-manager/ISO-Archive';
       const isoFilename = new URL(iso.url).pathname.split('/').pop();
       iso.path = `${archivePath}/${isoFilename}`;
       console.log('Constructed ISO path:', iso.path);
