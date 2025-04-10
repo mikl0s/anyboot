@@ -122,8 +122,21 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
   this.createIsoCard = function(iso) {
     var card = document.createElement('div');
     card.className = 'iso-card bg-dark-800 rounded-lg overflow-hidden border border-dark-700 hover:border-primary-500';
-    card.dataset.isoId = iso.name;
-    
+    card.dataset.isoId = iso.name; // Store the name
+
+    // Extract and store filename (assuming it's derivable from URL if not present)
+    let filename = iso.filename; // Use filename property if it exists
+    if (!filename && iso.url) {
+      try {
+        const urlParts = iso.url.split('/');
+        filename = urlParts[urlParts.length - 1];
+      } catch (e) {
+        console.warn('Could not extract filename from URL:', iso.url);
+        filename = ''; // Fallback
+      }
+    }
+    card.dataset.isoFilename = filename || ''; // Store the filename
+
     // Format size
     var sizeFormatted = this.formatSize(iso.size);
     
@@ -407,12 +420,8 @@ IsoManagerApp.prototype.setupEventListeners = function() {
 
   // Search and Filter
   const searchInput = document.getElementById('searchInput');
-  const filterSelect = document.getElementById('filterSelect');
   if (searchInput) {
     searchInput.addEventListener('input', () => this.filterIsoList());
-  }
-  if (filterSelect) {
-    filterSelect.addEventListener('change', () => this.filterIsoList());
   }
 
   // Refresh button
@@ -812,7 +821,39 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
 };
 
 IsoManagerApp.prototype.filterIsoList = function() {
-  // TO DO: implement filtering logic
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+  const isoGridContainer = document.getElementById('isoGrid');
+  const isoCards = isoGridContainer.querySelectorAll('.iso-card');
+  let visibleCount = 0;
+
+  isoCards.forEach(card => {
+    const isoName = card.dataset.isoId.toLowerCase(); // Assuming isoId stores the name
+    const isoFilename = card.dataset.isoFilename.toLowerCase(); // Get filename
+    // Add more fields to search if needed, e.g., iso.filename if stored
+    const isMatch = isoName.includes(searchTerm) || isoFilename.includes(searchTerm);
+
+    if (isMatch) {
+      card.style.display = ''; // Show card
+      visibleCount++;
+    } else {
+      card.style.display = 'none'; // Hide card
+    }
+  });
+
+  // Handle empty state (Optional: Show/hide an empty state message)
+  const emptyState = document.getElementById('emptyState');
+  if (emptyState) {
+    if (visibleCount === 0 && this.state.isoList.length > 0) {
+      emptyState.classList.remove('hidden');
+      // Optionally update empty state text for search context
+      const emptyText = emptyState.querySelector('h3');
+      if (emptyText) emptyText.textContent = 'No ISOs Match Your Search';
+      const emptyPara = emptyState.querySelector('p');
+      if (emptyPara) emptyPara.textContent = 'Try adjusting your search term.';
+    } else {
+      emptyState.classList.add('hidden');
+    }
+  }
 };
 
 // Initialize application when DOM is loaded

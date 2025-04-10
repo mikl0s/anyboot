@@ -86,14 +86,9 @@
 
         <!-- Main content -->
         <main class="flex-grow container mx-auto px-4 py-6">
-            <!-- Tabs -->
-            <div class="border-b border-gray-700 mb-6 flex">
-                <button class="tab-btn active px-4 py-2 font-medium border-b-2 border-primary-500 text-primary-400" data-tab-button="browse">Browse ISOs</button>
-            </div>
-
             <!-- Tab content -->
             <div id="tabContent">
-                <!-- ISO Browse Tab (Default) -->
+                <!-- ISO Browse Content (Default) -->
                 <div class="tab-content" data-tab-content="browse">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-xl font-semibold">Available ISO Images</h2>
@@ -102,18 +97,6 @@
                                 <input type="text" id="searchInput" placeholder="Search by name or OS..." class="bg-dark-800 text-white px-4 py-2 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 w-64">
                                 <i class="fas fa-search absolute right-3 top-3 text-gray-400"></i>
                             </div>
-                            <select id="filterSelect" class="bg-dark-800 text-white px-4 py-2 rounded-md border border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                <option value="all">All OS Types</option>
-                                <option value="ubuntu">Ubuntu</option>
-                                <option value="debian">Debian</option>
-                                <option value="mint">Linux Mint</option>
-                                <option value="fedora">Fedora</option>
-                                <option value="windows">Windows</option>
-                                <option value="freebsd">FreeBSD</option>
-                                <option value="arch">Arch</option>
-                                <option value="opensuse">openSUSE</option>
-                                <option value="other">Other</option>
-                            </select>
                         </div>
                     </div>
 
