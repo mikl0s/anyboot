@@ -301,7 +301,7 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
             deleteButton.addEventListener('click', (e) => {
                 e.stopPropagation(); // Prevent card click
                 const filename = card.dataset.isoFilename; // Get filename from card data
-                if (filename && confirm(`Are you sure you want to delete the downloaded file '${filename}'? This cannot be undone.`)) {
+                if (filename) {
                     this.deleteHandler(filename, card); // Pass filename and card element
                 }
             });
@@ -361,6 +361,22 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
     }
     
     return `${size.toFixed(2)} ${units[unitIndex]}`;
+  };
+  
+  this.updateIsoCard = function(iso) {
+    // Find the card by iso name
+    const card = document.querySelector(`[data-iso-id="${CSS.escape(iso.name)}"]`);
+    if (!card) {
+      console.error(`Card not found for ISO: ${iso.name}`);
+      return;
+    }
+    
+    // Log the update operation
+    console.log(`Updating card for ISO: ${iso.name}, inArchive: ${iso.inArchive}`);
+    
+    // Re-create the card with updated state
+    const newCard = this.createIsoCard(iso);
+    card.parentNode.replaceChild(newCard, card);
   };
 }
 
@@ -820,6 +836,17 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
         if (downloadData.overlayElements) {
           self.ui.removeDownloadOverlay(downloadData.overlayElements);
         }
+        
+        // --- Refresh the card to update its state (Download → Verify) ---
+        if (downloadData.isoCard && downloadData.iso) {
+          console.log('Refreshing card after download completion:', downloadData.iso.name);
+          
+          // Update the ISO object to indicate it's now downloaded
+          downloadData.iso.inArchive = true;
+          
+          // Re-create the card with updated state
+          self.isoGrid.updateIsoCard(downloadData.iso);
+        }
       } else if (progressData.status === 'error') {
         // Create an error message
         var errorMessage = `Download of ${downloadData.iso.name} failed: ${progressData.error || 'Unknown error'}`;
@@ -1155,7 +1182,7 @@ IsoManagerApp.prototype.updateExistingCardDeleteButtons = function() {
                 if (!deleteButton.dataset.listenerAttached) {
                     deleteButton.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        if (confirm(`Are you sure you want to delete the file '${filename}'? This cannot be undone.`)) {
+                        if (filename) {
                             this.deleteIsoFile(filename, card);
                         }
                     });
@@ -1176,13 +1203,14 @@ IsoManagerApp.prototype.deleteIsoFile = function(filename, cardElement) {
     return;
   }
   console.log(`Attempting to delete ISO file: ${filename}`);
-  this.ui.createToast({ message: `Deleting ${filename}...`, type: 'info', autoClose: false });
+  this.ui.createToast({ message: `Deleting ${filename}...`, type: 'info', autoClose: true, autoCloseDelay: 3000 });
 
   fetch(`/api/iso-archive/${encodeURIComponent(filename)}`, {
     method: 'DELETE',
   })
   .then(response => {
-    this.ui.closeAllToasts(); // Close the 'deleting...' toast
+    // No need to close toasts manually, they will auto-close
+    
     if (!response.ok) {
       return response.json().then(errData => {
         throw new Error(errData.error || `Server error ${response.status}`);
@@ -1193,47 +1221,54 @@ IsoManagerApp.prototype.deleteIsoFile = function(filename, cardElement) {
     return response.json();
   })
   .then(data => {
-    console.log('Delete successful:', data.message);
-    this.ui.createToast({ message: `'${filename}' deleted successfully.`, type: 'success', autoClose: true, autoCloseDelay: 4000 });
+    console.log('Delete successful, server response:', data);
+    this.ui.createToast({ message: `'${filename}' deleted successfully.`, type: 'success', autoClose: true, autoCloseDelay: 3000 });
 
     // Update state
     this.state.downloadedIsoFiles = this.state.downloadedIsoFiles.filter(f => f !== filename);
 
     // Update UI for the specific card
     if (cardElement) {
-      const deleteButton = cardElement.querySelector('.delete-iso-button');
-      if (deleteButton) {
-        deleteButton.classList.add('hidden');
-        deleteButton.dataset.listenerAttached = 'false'; // Reset marker
-      }
-      // Change the main button back to 'Download'
-      const actionButton = cardElement.querySelector('.verify-button'); // Find the verify button specifically
-      if (actionButton) {
-        const isoName = cardElement.dataset.isoId;
-        const isoObject = this.state.isoList.find(item => item.name === isoName);
+      const isoId = cardElement.dataset.isoId;
+      if (isoId) {
+        // Find the ISO object
+        const isoObject = this.state.isoList.find(item => item.name === isoId);
         if (isoObject) {
-          // Change classes, icon, text
-          actionButton.classList.remove('verify-button', 'bg-accent3-500', 'hover:bg-accent3-600');
-          actionButton.classList.add('download-button', 'bg-primary-600', 'hover:bg-primary-700');
-          actionButton.querySelector('i').className = 'fas fa-download mr-1.5'; // Update icon
-          actionButton.querySelector('span').textContent = 'Download'; // Update text
-
-          // Replace listener to point to the download handler
-          this.replaceButtonListener(actionButton, this.handleDownloadRequest, isoObject);
+          // Update the ISO object to indicate it's no longer in the archive
+          isoObject.inArchive = false;
+          
+          // Force a refresh of the card
+          console.log('Forcing card refresh after delete for:', isoId);
+          
+          // Option 1: Use the updateIsoCard method
+          this.isoGrid.updateIsoCard(isoObject);
+          
+          // Option 2: Direct DOM manipulation as fallback
+          const downloadButton = cardElement.querySelector('.verify-button');
+          if (downloadButton) {
+            // Change button appearance
+            downloadButton.classList.remove('verify-button', 'bg-accent3-500', 'hover:bg-accent3-600');
+            downloadButton.classList.add('download-button', 'bg-primary-600', 'hover:bg-primary-700');
+            
+            // Update icon and text
+            const icon = downloadButton.querySelector('i');
+            const text = downloadButton.querySelector('span');
+            if (icon) icon.className = 'fas fa-download mr-1.5';
+            if (text) text.textContent = 'Download';
+            
+            // Hide delete button
+            const deleteBtn = cardElement.querySelector('.delete-iso-button');
+            if (deleteBtn) deleteBtn.classList.add('hidden');
+          }
         } else {
-          console.warn("Could not find ISO object to reset action button after delete for:", isoName);
+          console.warn("Could not find ISO object to refresh card after delete for:", isoId);
         }
       }
-      // Refresh list or specific card state? For now, just hide button.
-
     }
-    // Refresh list or specific card state? For now, just hide button.
-
   })
   .catch(error => {
-    this.ui.closeAllToasts();
     console.error('Error deleting ISO file:', error);
-    this.ui.createToast({ message: `Error deleting file: ${error.message}`, type: 'error', autoClose: false });
+    this.ui.createToast({ message: `Error deleting file: ${error.message}`, type: 'error', autoClose: true, autoCloseDelay: 5000 });
   });
 };
 
