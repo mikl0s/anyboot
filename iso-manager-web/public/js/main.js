@@ -7,10 +7,11 @@
 import { UI } from './ui.js';
 
 // Simple ISO Grid class
-function IsoGrid(containerId, downloadHandler, verifyHandler) {
+function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
   this.container = document.querySelector(containerId);
   this.downloadHandler = downloadHandler;
   this.verifyHandler = verifyHandler;
+  this.deleteHandler = deleteHandler;
   
   if (!this.container) {
     console.error(`Container ${containerId} not found`);
@@ -246,6 +247,9 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
     // Determine version display
     var versionDisplay = iso.version || 'Latest';
     
+    // Capture the specific iso object for this card
+    const specificIso = iso;
+
     // Card content
     card.innerHTML = `
       <div class="card-accent"></div>
@@ -298,28 +302,37 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
                 e.stopPropagation(); // Prevent card click
                 const filename = card.dataset.isoFilename; // Get filename from card data
                 if (filename && confirm(`Are you sure you want to delete the downloaded file '${filename}'? This cannot be undone.`)) {
-                    this.deleteIsoFile(filename, card); // Pass filename and card element
+                    this.deleteHandler(filename, card); // Pass filename and card element
                 }
             });
             deleteButton.dataset.listenerAttached = 'true'; // Mark as attached
         }
     }
 
-    // Add listener to the main action button
-    if (actionButton) {
-        actionButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const cardElement = e.target.closest('.iso-card');
-            if (!cardElement) return;
-            const isoName = cardElement.dataset.isoId;
-            const isoObject = this.state.isoList.find(item => item.name === isoName);
-            if (isoObject) {
-                actionHandler.call(this, isoObject);
-            } else {
-                console.error("Could not find ISO object for action button:", isoName);
-            }
-        });
-    }
+    actionButton.dataset.isoFilename = card.dataset.isoFilename || '';
+
+    // --- Revised Event Listener ---
+    actionButton.addEventListener('click', (event) => {
+      event.preventDefault(); // Prevent default button action
+      const button = event.currentTarget;
+
+      // Use the 'specificIso' captured from the outer scope
+      if (specificIso) {
+        // Determine which handler to call based on the button's class
+        // this.downloadHandler/verifyHandler refer to the correctly bound
+        // methods stored on the IsoGrid instance.
+        if (button.classList.contains('download-button')) {
+          this.downloadHandler(specificIso);
+        } else if (button.classList.contains('verify-button')) {
+          this.verifyHandler(specificIso);
+        }
+      } else {
+        // This case is less likely now, but good to have a fallback
+        console.error(`ISO object was unexpectedly undefined for button: ${button.dataset.isoId}`);
+        alert(`Error: Could not find ISO data for action.`); // Simple fallback alert
+      }
+    });
+    // --- End Revised Listener ---
 
     // Check if title needs scrolling animation
     const titleElement = card.querySelector('.scrolling-title');
@@ -388,7 +401,8 @@ function IsoManagerApp() {
   this.isoGrid = new IsoGrid(
     '#isoGrid',
     this.handleDownloadRequest.bind(this),
-    this.handleVerifyRequest.bind(this)
+    this.handleVerifyRequest.bind(this),
+    this.deleteIsoFile.bind(this)
   );
   
   // Track application state
@@ -622,7 +636,8 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
     });
     
     // Find the ISO card in the DOM
-    const isoCard = document.querySelector(`[data-iso-id="${iso.name}"]`);
+    // --- Use CSS.escape() for the selector ---
+    const isoCard = document.querySelector(`[data-iso-id="${CSS.escape(iso.name)}"]`);
     if (isoCard) {
       // Create download overlay using the UI class method
       const overlayElements = this.ui.createDownloadOverlay(isoCard, iso);
@@ -733,6 +748,7 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
       // Update the progress display on the ISO card
       if (downloadData.overlayElements) {
         console.log('Updating progress display to:', downloadData.progress + '%');
+        console.log('DEBUG: Calling updateDownloadOverlay with:', { elements: downloadData.overlayElements, progressData }); // Added Log
         
         // Update the progress and ETA text
         self.ui.updateDownloadOverlay(downloadData.overlayElements, downloadData.progress, timeRemaining || 'Calculating...');

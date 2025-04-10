@@ -1412,11 +1412,13 @@ export class UI {
         isoCard.appendChild(overlay);
 
         // Return references to overlay elements
-        return {
+        const elementsToReturn = {
             overlay,
             progressText: overlay.querySelector('.download-progress-text'),
             etaText: overlay.querySelector('.download-eta')
         };
+        console.log('DEBUG: Returning overlay elements:', elementsToReturn);
+        return elementsToReturn;
     }
 
     /**
@@ -1426,13 +1428,17 @@ export class UI {
      * @param {string} eta - Estimated time remaining
      */
     updateDownloadOverlay(overlayElements, progress, eta) {
+        console.log('DEBUG: updateDownloadOverlay received:', { overlayElements, progress, eta });
+
         if (!overlayElements || !overlayElements.progressText || !overlayElements.etaText) {
             console.error('Cannot update download overlay: Invalid overlay elements');
             return;
         }
 
         // Update progress text
+        console.log('DEBUG: Before progressText update:', overlayElements.progressText.textContent);
         overlayElements.progressText.textContent = `${Math.floor(progress)}%`;
+        console.log('DEBUG: After progressText update:', overlayElements.progressText.textContent);
 
         // Update ETA text
         if (eta) {
