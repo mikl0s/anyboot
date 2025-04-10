@@ -1234,12 +1234,18 @@ export class UI {
                     </div>
                 </div>
 
-                <!-- Step Details Container (Flex, min-height) -->
-                <div class="mb-4 flex flex-col space-y-2" style="min-height: 80px;"> <!-- Added flex container and min-height -->
-                    <div class="verification-step-details hash-details p-3 bg-slate-700 rounded flex-grow hidden"> <!-- Added flex-grow -->
-                        <p class="text-sm text-slate-300">Calculating hash...</p>
+                <!-- Step Details Container (Flex, equal height) -->
+                <div class="mb-4 flex flex-col"> 
+                    <div class="verification-step-details hash-details p-3 bg-slate-700 rounded flex-grow hidden"> 
+                        <!-- Spinner -->
+                        <div class="hash-spinner flex items-center justify-center hidden">
+                            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-300 mr-2"></div>
+                            <span class="text-sm text-slate-300">Calculating local file hash...</span>
+                        </div>
+                        <!-- Result Text -->
+                        <p class="hash-result-text text-sm text-slate-300 hidden"></p>
                     </div>
-                    <div class="verification-step-details compare-details p-3 bg-slate-700 rounded flex-grow hidden"> <!-- Added flex-grow -->
+                    <div class="verification-step-details compare-details p-3 bg-slate-700 rounded flex-grow mt-2 hidden"> 
                         <p class="text-sm text-slate-300">Comparing hash values...</p>
                     </div>
                 </div>
@@ -1272,58 +1278,67 @@ export class UI {
                     element: backdrop.querySelector('.verification-step[data-step="hash"]'),
                     icon: backdrop.querySelector('.verification-step[data-step="hash"] .step-icon'),
                     label: backdrop.querySelector('.verification-step[data-step="hash"] .step-label'),
-                    detailsElement: backdrop.querySelector('.hash-details'),
+                    detailsElement: backdrop.querySelector('.hash-details'), 
+                    spinnerElement: backdrop.querySelector('.hash-spinner'), 
+                    resultTextElement: backdrop.querySelector('.hash-result-text'), 
                     updateStatus: function(status) { /* pending, success, error */
                         this.icon.classList.remove('bg-slate-600', 'bg-green-500', 'bg-red-500', 'border-slate-500', 'border-green-700', 'border-red-700');
                         this.label.classList.remove('text-slate-400', 'text-green-300', 'text-red-300');
-                        this.detailsElement.classList.remove('hidden');
+                        this.spinnerElement.classList.add('hidden'); 
+                        this.resultTextElement.classList.add('hidden'); 
+                        this.detailsElement.classList.remove('hidden'); 
+
                         if (status === 'success') {
                             this.icon.classList.add('bg-green-500', 'border-green-700');
                             this.label.classList.add('text-green-300');
-                            this.icon.textContent = '\u2714'; // Checkmark
+                            this.icon.textContent = '\u2714'; 
+                            this.resultTextElement.classList.remove('hidden'); 
                         } else if (status === 'error') {
                             this.icon.classList.add('bg-red-500', 'border-red-700');
                             this.label.classList.add('text-red-300');
-                            this.icon.textContent = '\u2718'; // X mark
+                            this.icon.textContent = '\u2718'; 
+                            this.resultTextElement.classList.remove('hidden'); 
                         } else { // pending
                             this.icon.classList.add('bg-slate-600', 'border-slate-500');
                             this.label.classList.add('text-slate-400');
                             this.icon.textContent = '1';
-                            this.detailsElement.classList.add('hidden');
+                            this.spinnerElement.classList.remove('hidden'); 
                         }
                     },
                     updateDetails: function(text) {
-                        this.detailsElement.querySelector('p').textContent = text;
-                        this.detailsElement.classList.remove('hidden');
+                        this.resultTextElement.textContent = text;
+                        this.resultTextElement.classList.remove('hidden'); 
+                        this.spinnerElement.classList.add('hidden'); 
+                        this.detailsElement.classList.remove('hidden'); 
                     }
                 },
                 compareStep: {
                     element: backdrop.querySelector('.verification-step[data-step="compare"]'),
                     icon: backdrop.querySelector('.verification-step[data-step="compare"] .step-icon'),
                     label: backdrop.querySelector('.verification-step[data-step="compare"] .step-label'),
-                    detailsElement: backdrop.querySelector('.compare-details'),
+                    detailsElement: backdrop.querySelector('.compare-details'), 
                     updateStatus: function(status) {
                         this.icon.classList.remove('bg-slate-600', 'bg-green-500', 'bg-red-500', 'border-slate-500', 'border-green-700', 'border-red-700');
                         this.label.classList.remove('text-slate-400', 'text-green-300', 'text-red-300');
-                        this.detailsElement.classList.remove('hidden');
+                        this.detailsElement.classList.remove('hidden'); 
+
                         if (status === 'success') {
                             this.icon.classList.add('bg-green-500', 'border-green-700');
                             this.label.classList.add('text-green-300');
-                            this.icon.textContent = '\u2714'; // Checkmark
+                            this.icon.textContent = '\u2714'; 
                         } else if (status === 'error') {
                             this.icon.classList.add('bg-red-500', 'border-red-700');
                             this.label.classList.add('text-red-300');
-                            this.icon.textContent = '\u2718'; // X mark
+                            this.icon.textContent = '\u2718'; 
                         } else {
                             this.icon.classList.add('bg-slate-600', 'border-slate-500');
                             this.label.classList.add('text-slate-400');
                             this.icon.textContent = '2';
-                            this.detailsElement.classList.add('hidden');
                         }
                     },
                     updateDetails: function(text) {
-                        this.detailsElement.querySelector('p').textContent = text;
-                        this.detailsElement.classList.remove('hidden');
+                        this.detailsElement.querySelector('p').textContent = text; 
+                        this.detailsElement.classList.remove('hidden'); 
                     }
                 }
             };
@@ -1331,16 +1346,16 @@ export class UI {
             // Add event listeners after defining hideModal
             // Close button functionality (X button)
             const closeXButton = modal.querySelector('.close-x-btn');
-            if (closeXButton) { // Check if button exists
+            if (closeXButton) { 
                 closeXButton.addEventListener('click', hideModal);
             } else {
                 console.warn('Verification modal X close button not found.');
             }
 
             // Close modal when clicking backdrop
-            if (backdrop) { // Check if backdrop exists
+            if (backdrop) { 
                 backdrop.addEventListener('click', (event) => {
-                    if (event.target === backdrop) { // Check if the click was directly on the backdrop
+                    if (event.target === backdrop) { 
                         hideModal();
                     }
                 });
@@ -1352,8 +1367,8 @@ export class UI {
                 modal: modal,
                 backdrop: backdrop,
                 steps: steps,
-                hide: hideModal, // Keep the hide method
-                show: () => {     // <-- ADD THIS show METHOD
+                hide: hideModal, 
+                show: () => {     
                     backdrop.classList.remove('hidden');
                     // Trigger the transition classes removal slightly after display to ensure animation works
                     requestAnimationFrame(() => {
