@@ -681,36 +681,36 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
           url: iso.url
         })
       })
-        .then(function(response) {
-          if (!response.ok) {
-            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-          }
-          return response.json();
-        })
-        .then(function(downloadInfo) {
-          // Store download information
-          self.state.activeDownloads.set(downloadInfo.downloadId, { 
-            iso, 
-            overlayElements,
-            startTime: new Date(),
-            progress: 0,
-            isoCard
-          });
-          
-          // Set up progress polling
-          self.pollDownloadProgress(downloadInfo.downloadId);
-        })
-        .catch(function(error) {
-          console.error('Error handling download request:', error);
-          
-          // Remove the overlay
-          if (overlayElements) {
-            self.ui.removeDownloadOverlay(overlayElements);
-          }
-          
-          // Show error toast
-          self.ui.showToast(`Download error: ${error.message}`, 'error', 5000, false);
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(function(downloadInfo) {
+        // Store download information
+        self.state.activeDownloads.set(downloadInfo.downloadId, { 
+          iso, 
+          overlayElements,
+          startTime: new Date(),
+          progress: 0,
+          isoCard
         });
+        
+        // Set up progress polling
+        self.pollDownloadProgress(downloadInfo.downloadId);
+      })
+      .catch(function(error) {
+        console.error('Error handling download request:', error);
+        
+        // Remove the overlay
+        if (overlayElements) {
+          self.ui.removeDownloadOverlay(overlayElements);
+        }
+        
+        // Show error toast
+        self.ui.showToast(`Download error: ${error.message}`, 'error', 5000, false);
+      });
     } else {
       console.error('ISO card not found in DOM for:', iso.name);
       this.ui.showToast(`Could not find ISO card for ${iso.name}`, 'error', 5000, false);
@@ -835,18 +835,32 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
 
 IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
   var self = this;
+  let verificationModal = null; // Define modal variable in the outer scope
+
   try {
     console.log('Verification requested for:', iso);
-    
+
     // Check if the ISO has a path property
     if (!iso.path) {
-      // For ISOs in the archive, we need to construct the path
       const archivePath = self.state.config.isoArchive || '/home/mikkel/repos/anyboot/iso-manager/ISO-Archive';
       const isoFilename = new URL(iso.url).pathname.split('/').pop();
       iso.path = `${archivePath}/${isoFilename}`;
       console.log('Constructed ISO path:', iso.path);
     }
-    
+
+    // --- Use UI.js to create the modal --- 
+    verificationModal = self.ui.createVerificationModal(iso);
+    if (!verificationModal || !verificationModal.steps || !verificationModal.modal) {
+      console.error('Failed to create verification modal or modal structure is invalid.');
+      self.ui.showToast('Failed to create verification modal.', 'error', 5000, false);
+      return;
+    }
+
+    // Update the file step to success immediately
+    verificationModal.steps.fileStep.updateStatus('success');
+    verificationModal.steps.fileStep.updateDetails(`Using file at: ${iso.path}`);
+    // --- End UI.js modal creation --- 
+
     // Call the API to verify ISO
     fetch('/api/verify', {
       method: 'POST',
@@ -859,28 +873,76 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
         expectedHash: iso.hash || ''
       })
     })
-      .then(function(response) {
-        if (!response.ok) {
-          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+    .then(response => {
+      if (!response.ok) {
+        return response.text().then(text => {
+          let errorMessage = `Server returned ${response.status}: ${response.statusText}`;
+          try {
+            const errorJson = JSON.parse(text);
+            errorMessage = errorJson.error || errorMessage;
+          } catch (e) { /* Ignore */ }
+          // Add error details to the error object
+          const error = new Error(errorMessage);
+          error.details = text; // Store raw response text
+          throw error;
+        });
+      }
+      return response.json();
+    })
+    .then(result => {
+      console.log('Verification result:', result);
+
+      // --- Update modal steps based on API result --- 
+      verificationModal.steps.hashStep.updateStatus('success');
+      const algorithm = result.algorithm ? result.algorithm.toUpperCase() : 'SHA256';
+      const hashDisplay = result.hash || 'N/A';
+      verificationModal.steps.hashStep.updateDetails(`Calculated ${algorithm}: ${hashDisplay}`);
+
+      const modalTitle = verificationModal.modal.querySelector('.verification-modal-title');
+
+      if (result.isValid) {
+        verificationModal.steps.compareStep.updateStatus('success');
+        verificationModal.steps.compareStep.updateDetails('Hash values match. The ISO is authentic.');
+        if (modalTitle) {
+          modalTitle.textContent = `${iso.name} verified successfully`;
+          modalTitle.style.color = 'var(--color-accent3-500)'; 
         }
-        return response.json();
-      })
-      .then(function(result) {
-        console.log('Verification result:', result);
-        // Show verification result as toast
-        if (result.isValid) {
-          self.ui.showToast(`${iso.name} verified successfully`, 'success', 5000, false);
-        } else {
-          self.ui.showToast(`${iso.name} verification failed`, 'error', 5000, false);
+      } else {
+        verificationModal.steps.compareStep.updateStatus('error');
+        const expectedHash = result.expectedHash || 'Not provided';
+        verificationModal.steps.compareStep.updateDetails(
+          `Hashes do not match!\nExpected: ${expectedHash}\nActual:   ${hashDisplay}`
+        );
+        if (modalTitle) {
+          modalTitle.textContent = `Verification failed for ${iso.name}`;
+          modalTitle.style.color = 'var(--color-accent2-500)'; 
         }
-      })
-      .catch(function(error) {
-        console.error('Error handling verify request:', error);
-        self.ui.showToast(`Verification error: ${error.message}`, 'error', 5000, false);
-      });
+      }
+      // --- End modal update --- 
+    })
+    .catch(error => {
+      console.error('Error during verification API call:', error);
+      
+      // --- Update modal steps to show error --- 
+      if (verificationModal && verificationModal.steps) { 
+        // Determine which step failed based on error or assume hash/compare failed
+        verificationModal.steps.hashStep.updateStatus('error');
+        verificationModal.steps.hashStep.updateDetails('Failed during hash calculation or comparison.');
+        verificationModal.steps.compareStep.updateStatus('error');
+        verificationModal.steps.compareStep.updateDetails(`Error: ${error.message}`);
+
+        const modalTitle = verificationModal.modal.querySelector('.verification-modal-title');
+        if (modalTitle) {
+          modalTitle.textContent = `Verification error for ${iso.name}`;
+          modalTitle.style.color = 'var(--color-accent2-500)'; 
+        }
+      }
+      // --- End modal error update --- 
+    }); // End of fetch promise chain
   } catch (error) {
-    console.error('Error handling verify request:', error);
-    self.ui.showToast(`Verification error: ${error.message}`, 'error', 5000, false);
+    console.error('Error setting up verification request:', error);
+    // Show toast for errors *before* modal creation or fetch call
+    self.ui.showToast(`Setup error: ${error.message}`, 'error', 5000, false);
   }
 };
 
