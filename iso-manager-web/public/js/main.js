@@ -174,6 +174,25 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
       var card = this.createIsoCard(iso);
       this.container.appendChild(card);
     }.bind(this));
+    
+    // Check for title scrolling after adding to DOM
+    this.container.querySelectorAll('[data-check-scrolling]').forEach(function(card) {
+      const titleElement = card.querySelector('.scrolling-title');
+      const titleContainer = card.querySelector('.title-container');
+      if (titleElement && titleContainer) {
+        // Wait for the DOM to be fully rendered
+        setTimeout(() => {
+          // If the title is wider than its container, keep the animation
+          if (titleElement.offsetWidth > titleContainer.offsetWidth) {
+            titleElement.classList.add('needs-scrolling');
+          } else {
+            // Otherwise remove the animation class
+            titleElement.classList.remove('scrolling-title');
+          }
+        }, 100);
+      }
+      card.removeAttribute('data-check-scrolling');
+    });
   };
   
   this.createIsoCard = function(iso) {
@@ -290,11 +309,13 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
     // Card content
     card.innerHTML = `
       <div class="card-accent"></div>
-      <div class="p-4 flex flex-col h-full">
+      <div class="p-4 flex flex-col h-full overflow-hidden">
         <div class="flex items-start">
           ${osLogo}
-          <div class="ml-3 flex-grow">
-            <h3 class="text-lg font-semibold text-white mb-1">${iso.name}</h3>
+          <div class="ml-3 flex-grow overflow-hidden">
+            <div class="title-container">
+              <h3 class="text-lg font-semibold text-white mb-1 scrolling-title">${iso.name}</h3>
+            </div>
             <div class="flex justify-between items-center">
               <div class="text-sm text-gray-400 flex items-center">
                 <i class="fas fa-tag mr-1"></i>
@@ -324,6 +345,15 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
       button.addEventListener('click', function() {
         actionHandler(iso);
       });
+    }
+    
+    // Check if title needs scrolling animation
+    const titleElement = card.querySelector('.scrolling-title');
+    const titleContainer = card.querySelector('.title-container');
+    if (titleElement && titleContainer) {
+      // Add the card to the DOM first so we can measure it
+      // We'll check after it's been added to the DOM
+      card.dataset.checkScrolling = 'true';
     }
     
     return card;

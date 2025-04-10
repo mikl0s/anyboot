@@ -213,11 +213,13 @@ body {
 
 /* OS Logo styling with improved visibility */
 .os-logo {
+  min-width: 48px;
   width: 48px;
   height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   border-radius: 12px;
   background-color: rgba(209, 213, 219, 0.15);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -360,6 +362,31 @@ input[type="checkbox"]:checked::after {
   }
 }
 
+/* Scrolling title animation for long titles */
+@keyframes scroll-title {
+  0% { transform: translateX(0); }
+  10% { transform: translateX(0); } /* Initial pause */
+  60% { transform: translateX(calc(-100% + 200px)); } /* Scroll to end */
+  70% { transform: translateX(calc(-100% + 200px)); } /* Pause at end */
+  100% { transform: translateX(0); } /* Return to start */
+}
+
+.iso-card .title-container {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.iso-card .scrolling-title {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.iso-card:hover .scrolling-title.needs-scrolling {
+  animation: scroll-title 10s linear infinite;
+}
+
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .iso-card::before {
@@ -368,9 +395,5 @@ input[type="checkbox"]:checked::after {
   
   .iso-card:hover::before {
     height: 4px;
-  }
-  
-  .os-logo {
-    font-size: 2rem;
   }
 }
