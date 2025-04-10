@@ -85,6 +85,49 @@ function UIBase() {
     
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   };
+  
+  this.createDownloadOverlay = function(isoCard, iso) {
+    const overlay = document.createElement('div');
+    overlay.className = 'iso-card-download-overlay';
+    overlay.innerHTML = `
+      <svg class="download-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 3"/>
+        <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div class="download-progress-text">0%</div>
+      <div class="download-eta">Preparing download...</div>
+    `;
+    
+    isoCard.appendChild(overlay);
+    
+    return {
+      overlay,
+      progressText: overlay.querySelector('.download-progress-text'),
+      etaText: overlay.querySelector('.download-eta')
+    };
+  };
+  
+  this.removeDownloadOverlay = function(overlayElements) {
+    if (overlayElements.overlay && overlayElements.overlay.parentNode) {
+      overlayElements.overlay.parentNode.removeChild(overlayElements.overlay);
+    }
+  };
+  
+  this.updateDownloadOverlay = function(overlayElements, progress, eta) {
+    if (overlayElements && overlayElements.progressText && overlayElements.progressText.parentNode) {
+      console.log('Updating progress display to:', progress + '%');
+      
+      // Update the progress text
+      overlayElements.progressText.textContent = `${Math.floor(progress)}%`;
+      
+      // Update the ETA text
+      if (eta) {
+        overlayElements.etaText.textContent = eta;
+      } else {
+        overlayElements.etaText.textContent = 'Calculating...';
+      }
+    }
+  };
 }
 
 // Simple ISO Grid class
@@ -203,6 +246,7 @@ function IsoGrid(containerId, downloadHandler, verifyHandler) {
   this.createIsoCard = function(iso) {
     var card = document.createElement('div');
     card.className = 'iso-card bg-dark-800 rounded-lg overflow-hidden border border-dark-700 hover:border-primary-500';
+    card.dataset.isoId = iso.name;
     
     // Format size
     var sizeFormatted = this.formatSize(iso.size);
@@ -619,71 +663,65 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
   try {
     console.log('Download requested for:', iso);
     
-    // Create toast for download with progress indicator
-    var toast = this.ui.showToast(
-      `<div class="flex flex-col w-full">
-        <div class="flex justify-between items-center w-full">
-          <span>Starting download for ${iso.name}...</span>
-          <span class="text-xs progress-percentage">0%</span>
-        </div>
-        <div class="mt-2 w-full bg-gray-700 rounded-full h-2.5">
-          <div class="download-progress bg-purple-600 h-2.5 rounded-full" style="width: 0%"></div>
-        </div>
-      </div>`, 
-      'info', 0, true
+    // Show a simple toast notification that download has started
+    this.ui.showToast(
+      `Download started for ${iso.name}`,
+      'info', 3000, false
     );
     
-    // Call the API to start download
-    fetch('/api/download', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: iso.url
+    // Find the ISO card in the DOM
+    const isoCard = document.querySelector(`[data-iso-id="${iso.name}"]`);
+    if (isoCard) {
+      // Create download overlay using the UI class method
+      const overlayElements = this.ui.createDownloadOverlay(isoCard, iso);
+      
+      // Call the API to start download
+      fetch('/api/download', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: iso.url
+        })
       })
-    })
-      .then(function(response) {
-        if (!response.ok) {
-          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-      })
-      .then(function(downloadInfo) {
-        // Update toast with download progress
-        var progressHtml = `
-          <div class="flex flex-col w-full">
-            <div class="flex justify-between items-center w-full">
-              <span>Downloading ${iso.name}...</span>
-              <span class="text-xs progress-percentage">0%</span>
-            </div>
-            <div class="mt-2 w-full bg-gray-700 rounded-full h-2.5">
-              <div class="download-progress bg-purple-600 h-2.5 rounded-full" style="width: 0%"></div>
-            </div>
-          </div>
-        `;
-        
-        // Update the toast with HTML content
-        toast.innerHTML = progressHtml;
-        
-        // Store toast reference for updates
-        self.state.activeDownloads.set(downloadInfo.downloadId, { 
-          iso, 
-          toast,
-          startTime: new Date(),
-          progress: 0
+        .then(function(response) {
+          if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(function(downloadInfo) {
+          // Store download information
+          self.state.activeDownloads.set(downloadInfo.downloadId, { 
+            iso, 
+            overlayElements,
+            startTime: new Date(),
+            progress: 0,
+            isoCard
+          });
+          
+          // Set up progress polling
+          self.pollDownloadProgress(downloadInfo.downloadId);
+        })
+        .catch(function(error) {
+          console.error('Error handling download request:', error);
+          
+          // Remove the overlay
+          if (overlayElements) {
+            self.ui.removeDownloadOverlay(overlayElements);
+          }
+          
+          // Show error toast
+          self.ui.showToast(`Download error: ${error.message}`, 'error', 5000, false);
         });
-        
-        // Set up progress polling
-        self.pollDownloadProgress(downloadInfo.downloadId);
-      })
-      .catch(function(error) {
-        console.error('Error handling download request:', error);
-        self.ui.updateToast(toast, `Download error: ${error.message}`, 'error', 0, true);
-      });
+    } else {
+      console.error('ISO card not found in DOM for:', iso.name);
+      this.ui.showToast(`Could not find ISO card for ${iso.name}`, 'error', 5000, false);
+    }
   } catch (error) {
     console.error('Error handling download request:', error);
-    this.ui.showToast(`Download error: ${error.message}`, 'error', 0, true);
+    this.ui.showToast(`Download error: ${error.message}`, 'error', 5000, false);
   }
 };
 
@@ -725,7 +763,7 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
         var totalSize = downloadData.iso.size;
         var downloadedSize = totalSize * (downloadData.progress / 100);
         var speedBps = downloadedSize / timeElapsed;
-        speed = self.formatSize(speedBps) + '/s';
+        speed = self.ui.formatFileSize(speedBps) + '/s';
         
         // Calculate time remaining
         var remainingSize = totalSize - downloadedSize;
@@ -740,60 +778,45 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
         }
       }
       
-      // Update the progress bar and text in the toast
-      if (downloadData.toast && downloadData.toast.parentNode) {
+      // Update the progress display on the ISO card
+      if (downloadData.overlayElements) {
         console.log('Updating progress display to:', downloadData.progress + '%');
         
-        // Get the progress bar and percentage elements
-        var progressBar = downloadData.toast.querySelector('.download-progress');
-        var percentText = downloadData.toast.querySelector('.progress-percentage');
-        
-        // Update the progress bar width
-        if (progressBar) {
-          progressBar.style.width = downloadData.progress + '%';
-          console.log('Set progress bar width to:', downloadData.progress + '%');
-        } else {
-          console.error('Progress bar element not found');
-        }
-        
-        // Update the percentage text
-        if (percentText) {
-          percentText.textContent = Math.floor(downloadData.progress) + '% ' + (speed ? '• ' + speed : '');
-          console.log('Updated percentage text to:', percentText.textContent);
-        } else {
-          console.error('Percentage text element not found');
-        }
-        
-        // Update the main text if we have time remaining info
-        if (timeRemaining) {
-          var mainText = downloadData.toast.querySelector('.flex.justify-between span:first-child');
-          if (mainText) {
-            mainText.textContent = `Downloading ${downloadData.iso.name}... ${timeRemaining}`;
-          }
-        }
+        // Update the progress and ETA text
+        self.ui.updateDownloadOverlay(downloadData.overlayElements, downloadData.progress, timeRemaining || 'Calculating...');
       }
       
-      // If download is complete, update the toast
+      // If download is complete, update the UI
       if (progressData.status === 'completed') {
         // Create a success message
         var successMessage = `Download of ${downloadData.iso.name} completed successfully!`;
         console.log('Download completed:', successMessage);
         
-        // Use the UI class's showToast method
+        // Show success toast
         self.ui.showToast(successMessage, 'success', 5000, false);
         
         // Remove from active downloads
         self.state.activeDownloads.delete(downloadId);
+        
+        // Remove the overlay
+        if (downloadData.overlayElements) {
+          self.ui.removeDownloadOverlay(downloadData.overlayElements);
+        }
       } else if (progressData.status === 'error') {
         // Create an error message
         var errorMessage = `Download of ${downloadData.iso.name} failed: ${progressData.error || 'Unknown error'}`;
         console.log('Download error:', errorMessage);
         
-        // Use the UI class's showToast method
+        // Show error toast
         self.ui.showToast(errorMessage, 'error', 5000, false);
         
         // Remove from active downloads
         self.state.activeDownloads.delete(downloadId);
+        
+        // Remove the overlay
+        if (downloadData.overlayElements) {
+          self.ui.removeDownloadOverlay(downloadData.overlayElements);
+        }
       } else {
         // Continue polling if download is still in progress
         setTimeout(function() {

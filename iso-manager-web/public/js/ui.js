@@ -1258,4 +1258,77 @@ export class UI {
             }
         });
     }
+
+    /**
+     * Create a download progress overlay on an ISO card
+     * @param {HTMLElement} isoCard - The ISO card element to add the overlay to
+     * @param {Object} iso - The ISO object
+     * @returns {Object} - Object containing the overlay and its components
+     */
+    createDownloadOverlay(isoCard, iso) {
+        if (!isoCard) {
+            console.error('Cannot create download overlay: ISO card not provided');
+            return null;
+        }
+
+        // Create overlay element
+        const overlay = document.createElement('div');
+        overlay.className = 'iso-card-download-overlay';
+        overlay.innerHTML = `
+            <svg class="download-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 3"/>
+                <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="download-progress-text">0%</div>
+            <div class="download-eta">Preparing download...</div>
+        `;
+
+        // Add overlay to card
+        isoCard.appendChild(overlay);
+
+        // Return references to overlay elements
+        return {
+            overlay,
+            progressText: overlay.querySelector('.download-progress-text'),
+            etaText: overlay.querySelector('.download-eta')
+        };
+    }
+
+    /**
+     * Update the download progress overlay
+     * @param {Object} overlayElements - Object containing overlay elements
+     * @param {number} progress - Progress percentage (0-100)
+     * @param {string} eta - Estimated time remaining
+     */
+    updateDownloadOverlay(overlayElements, progress, eta) {
+        if (!overlayElements || !overlayElements.progressText || !overlayElements.etaText) {
+            console.error('Cannot update download overlay: Invalid overlay elements');
+            return;
+        }
+
+        // Update progress text
+        overlayElements.progressText.textContent = `${Math.floor(progress)}%`;
+
+        // Update ETA text
+        if (eta) {
+            overlayElements.etaText.textContent = eta;
+        } else {
+            overlayElements.etaText.textContent = 'Calculating...';
+        }
+    }
+
+    /**
+     * Remove the download overlay from an ISO card
+     * @param {Object} overlayElements - Object containing overlay elements
+     */
+    removeDownloadOverlay(overlayElements) {
+        if (!overlayElements || !overlayElements.overlay) {
+            console.error('Cannot remove download overlay: Invalid overlay elements');
+            return;
+        }
+
+        if (overlayElements.overlay.parentNode) {
+            overlayElements.overlay.parentNode.removeChild(overlayElements.overlay);
+        }
+    }
 }
