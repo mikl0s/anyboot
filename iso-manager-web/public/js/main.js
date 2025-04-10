@@ -233,14 +233,18 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
     var buttonColorClass = 'bg-primary-600 hover:bg-primary-700';
     
     if (iso.inArchive) {
-      // Remove the In Archive badge and change the button instead
-      actionText = 'In archive - click to verify';
-      actionClass = 'verify';
-      actionHandler = this.verifyHandler;
-      buttonColorClass = 'bg-accent3-500 hover:bg-accent3-600'; // Green button for archived ISOs
-      
       if (iso.updateAvailable) {
-        badgeHtml += '<span class="badge badge-update">Update Available</span>';
+        // Show update button instead of verify button
+        actionText = 'Update Available';
+        actionClass = 'update';
+        actionHandler = this.downloadHandler; // Use download handler for updates
+        buttonColorClass = 'bg-accent2-500 hover:bg-accent2-600'; // Pink button for updates
+      } else {
+        // Regular verify button for archived ISOs without updates
+        actionText = 'In archive - click to verify';
+        actionClass = 'verify';
+        actionHandler = this.verifyHandler;
+        buttonColorClass = 'bg-accent3-500 hover:bg-accent3-600'; // Green button for archived ISOs
       }
     }
     
@@ -273,7 +277,7 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
         <!-- Bottom section -->
         <div class="mt-4 flex items-center"> 
           <button class="${actionClass}-button ${buttonColorClass} text-white font-bold py-2 px-4 rounded flex items-center justify-center flex-grow mr-2"> 
-            <i class="fas fa-${actionClass === 'download' ? 'download' : 'check-circle'} mr-2"></i>
+            <i class="fas fa-${actionClass === 'download' ? 'download' : actionClass === 'update' ? 'sync-alt' : 'check-circle'} mr-2"></i>
             <span>${actionText}</span>
           </button>
           <button class="delete-iso-button text-red-500 hover:text-red-400 transition-colors duration-200 hidden p-1 rounded" title="Delete Downloaded ISO">
@@ -325,6 +329,47 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
           this.downloadHandler(specificIso);
         } else if (button.classList.contains('verify-button')) {
           this.verifyHandler(specificIso);
+        } else if (button.classList.contains('update-button')) {
+          // For updates, we need to delete the old version first, then download the new one
+          const oldFilename = card.dataset.isoFilename;
+          if (oldFilename) {
+            // First delete the old version
+            console.log(`Updating ISO: deleting old version ${oldFilename} before downloading new version`);
+            
+            // Create a toast notification
+            if (window.app && window.app.ui) {
+              window.app.ui.createToast({ 
+                message: `Updating ${specificIso.name}: removing old version...`, 
+                type: 'info', 
+                autoClose: true, 
+                autoCloseDelay: 3000 
+              });
+            }
+            
+            // Delete the old file first
+            fetch(`/api/iso-archive/${encodeURIComponent(oldFilename)}`, {
+              method: 'DELETE',
+            })
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Server error ${response.status}`);
+              }
+              return response.json();
+            })
+            .then(data => {
+              console.log('Old version deleted successfully, downloading new version');
+              // Now download the new version
+              this.downloadHandler(specificIso);
+            })
+            .catch(error => {
+              console.error('Error deleting old version:', error);
+              // If deletion fails, still try to download the new version
+              this.downloadHandler(specificIso);
+            });
+          } else {
+            // If we can't find the old filename, just download the new version
+            this.downloadHandler(specificIso);
+          }
         }
       } else {
         // This case is less likely now, but good to have a fallback

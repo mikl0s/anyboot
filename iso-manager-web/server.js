@@ -43,6 +43,14 @@ function loadConfiguration() {
 // Load the configuration
 const config = loadConfiguration();
 
+// Path to the isos.json file in the archive directory
+let isosJsonPath = '';
+
+// Initialize the isos.json path once config is loaded
+if (config && config.isoArchive) {
+  isosJsonPath = path.join(config.isoArchive, 'isos.json');
+}
+
 // Import the iso-manager.js script
 const isoManagerFactory = require('../iso-manager/iso-manager.js');
 const isoManager = isoManagerFactory();
@@ -193,6 +201,9 @@ function markArchivedIsos(isoList) {
     // Read directory contents
     const files = fs.readdirSync(archivePath);
     
+    // Read the isos.json file for more accurate metadata
+    const isosData = readIsosJson().isos;
+    
     // Process each ISO in the list
     const markedIsos = {};
     
@@ -200,26 +211,110 @@ function markArchivedIsos(isoList) {
       // Copy the details object to avoid modifying the original
       const detailsCopy = { ...details };
       
-      // Check if the ISO is in the archive
+      // Extract the ISO filename from the URL
       const isoFilename = path.basename(new URL(detailsCopy.url).pathname);
-      const inArchive = files.includes(isoFilename);
       
-      // If in archive, check if an update is available
+      // Normalize the filename for comparison (remove version numbers for base comparison)
+      const normalizedName = normalizeIsoName(name);
+      
+      // Check if any file in the archive matches this ISO (using normalized comparison)
+      let matchedFile = null;
+      let exactMatch = false;
+      let matchedIsoData = null;
+      
+      // First check if we have this ISO in our isos.json file by name
+      const isoDataByName = getIsoDataByName(name);
+      if (isoDataByName && files.includes(isoDataByName.filename)) {
+        // We have exact metadata for this ISO
+        matchedFile = isoDataByName.filename;
+        matchedIsoData = isoDataByName;
+        exactMatch = true;
+      }
+      // If no match in isos.json by name, try exact filename match
+      else if (files.includes(isoFilename)) {
+        matchedFile = isoFilename;
+        // Check if we have metadata for this filename
+        matchedIsoData = getIsoDataFromJson(isoFilename);
+        exactMatch = true;
+      } else {
+        // If no exact match, try to find a related file by normalizing names
+        for (const file of files) {
+          // Skip non-ISO files
+          if (!file.endsWith('.iso') && !file.endsWith('.img')) continue;
+          
+          // Check if the normalized names match
+          const normalizedFile = normalizeIsoName(file);
+          if (normalizedFile === normalizedName || 
+              file.includes(normalizedName) || 
+              normalizedName.includes(normalizedFile)) {
+            matchedFile = file;
+            // Check if we have metadata for this filename
+            matchedIsoData = getIsoDataFromJson(file);
+            break;
+          }
+        }
+      }
+      
+      // If we found a match, check if it's the same version or needs an update
       let updateAvailable = false;
+      let inArchive = false;
       
-      if (inArchive) {
-        const archivedFilePath = path.join(archivePath, isoFilename);
+      if (matchedFile) {
+        inArchive = true;
+        const archivedFilePath = path.join(archivePath, matchedFile);
         const stats = fs.statSync(archivedFilePath);
         
-        // Check if the size is different (simple update check)
-        if (detailsCopy.size && stats.size !== detailsCopy.size) {
-          updateAvailable = true;
+        // First check using our isos.json metadata if available
+        if (matchedIsoData) {
+          // We have metadata for this ISO, use it for accurate version comparison
+          const archivedVersion = matchedIsoData.version;
+          const newVersion = detailsCopy.version || extractVersionFromFilename(isoFilename);
+          
+          // Compare versions if both are available
+          if (archivedVersion && newVersion && archivedVersion !== newVersion) {
+            // Check if the new version is higher than the archived version
+            if (compareVersions(newVersion, archivedVersion) > 0) {
+              updateAvailable = true;
+              logger.log(`Update available for ${name}: ${archivedVersion} -> ${newVersion} (using isos.json metadata)`);
+            }
+          }
+          
+          // If versions are the same but sizes differ significantly, consider it an update
+          else if (detailsCopy.size && matchedIsoData.size && 
+                   Math.abs(detailsCopy.size - matchedIsoData.size) > 1024 * 1024) { // 1MB difference threshold
+            updateAvailable = true;
+            logger.log(`Update available for ${name}: size difference detected (${matchedIsoData.size} -> ${detailsCopy.size})`);
+          }
+        } 
+        // Fallback to basic checks if no metadata is available
+        else {
+          // Check if the size is different (simple update check)
+          if (detailsCopy.size && stats.size !== detailsCopy.size) {
+            updateAvailable = true;
+          }
+          
+          // Check version if available
+          if (detailsCopy.version && !exactMatch) {
+            // Extract version from filename
+            const archivedVersion = extractVersionFromFilename(matchedFile);
+            const newVersion = detailsCopy.version || extractVersionFromFilename(isoFilename);
+            
+            // Compare versions if both are available
+            if (archivedVersion && newVersion && archivedVersion !== newVersion) {
+              // Check if the new version is higher than the archived version
+              if (compareVersions(newVersion, archivedVersion) > 0) {
+                updateAvailable = true;
+                logger.log(`Update available for ${name}: ${archivedVersion} -> ${newVersion} (using filename extraction)`);
+              }
+            }
+          }
         }
       }
       
       // Update the details
       detailsCopy.inArchive = inArchive;
       detailsCopy.updateAvailable = updateAvailable;
+      detailsCopy.filename = matchedFile || isoFilename; // Store the actual filename
       
       // Add to the marked list
       markedIsos[name] = detailsCopy;
@@ -228,8 +323,55 @@ function markArchivedIsos(isoList) {
     return markedIsos;
   } catch (error) {
     logger.error(`Error marking archived ISOs: ${error.message}`);
-    return isoList;
+    return isoList; // Return original list on error
   }
+}
+
+// Helper function to normalize ISO names for comparison
+function normalizeIsoName(name) {
+  // Convert to lowercase
+  let normalized = name.toLowerCase();
+  
+  // Remove file extensions
+  normalized = normalized.replace(/\.(iso|img|esd)$/i, '');
+  
+  // Remove version numbers and common patterns
+  normalized = normalized.replace(/[-_]?\d+(\.\d+)+[-_]?/g, '');
+  normalized = normalized.replace(/[-_]?(amd64|x86_64|i386|x86|arm64)[-_]?/g, '');
+  normalized = normalized.replace(/[-_]?(live|desktop|server|netinst|dvd|cd)[-_]?/g, '');
+  
+  // Remove special characters and extra spaces
+  normalized = normalized.replace(/[^a-z0-9]/g, '');
+  
+  return normalized;
+}
+
+// Helper function to extract version from filename
+function extractVersionFromFilename(filename) {
+  // Common version patterns like: 12.04, 22.04.3, 11.2, etc.
+  const versionMatch = filename.match(/[\d]+(\.[\d]+)+/);
+  return versionMatch ? versionMatch[0] : null;
+}
+
+// Helper function to compare version strings
+function compareVersions(v1, v2) {
+  // Split versions by dots
+  const v1Parts = v1.split('.').map(Number);
+  const v2Parts = v2.split('.').map(Number);
+  
+  // Compare each part
+  for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
+    // Use 0 if the part doesn't exist
+    const part1 = i < v1Parts.length ? v1Parts[i] : 0;
+    const part2 = i < v2Parts.length ? v2Parts[i] : 0;
+    
+    // Compare parts
+    if (part1 > part2) return 1;
+    if (part1 < part2) return -1;
+  }
+  
+  // Versions are equal
+  return 0;
 }
 
 // API endpoint to list all files in the ISO archive directory
@@ -478,9 +620,42 @@ app.post('/api/download', async (req, res) => {
             downloads[downloadId].status = 'completed';
             downloads[downloadId].progress = 100;
             downloads[downloadId].result = result;
+            
+            // Add the downloaded ISO to the isos.json file
+            try {
+              const filename = path.basename(result.filePath);
+              const fileStats = fs.statSync(result.filePath);
+              
+              // Extract ISO name from URL or use filename as fallback
+              const urlObj = new URL(url);
+              const urlPathname = urlObj.pathname;
+              const urlFilename = path.basename(urlPathname);
+              
+              // Try to get a meaningful name from the URL or filename
+              let isoName = urlFilename;
+              // Remove file extension and common suffixes
+              isoName = isoName.replace(/\.(iso|img)$/i, '');
+              isoName = isoName.replace(/(-netinst|-dvd|-live|-bootonly|-minimal|-desktop)$/i, '');
+              
+              // Extract version if present in filename
+              const version = extractVersionFromFilename(filename);
+              
+              // Add to isos.json with hash and size
+              addIsoToJson(
+                { name: isoName, version: version },
+                filename,
+                result.hash,
+                fileStats.size
+              );
+              
+              console.log(`Added ${filename} to isos.json tracking file`);
+            } catch (error) {
+              console.error(`Error adding ISO to isos.json: ${error.message}`);
+            }
           }
         })
         .catch(error => {
+          // Handle immediate errors
           if (downloads[downloadId]) {
             downloads[downloadId].status = 'error';
             downloads[downloadId].error = error.message;
@@ -634,6 +809,16 @@ app.delete('/api/iso-archive/:filename', (req, res) => {
         console.error(`Error deleting file ${fullPathToDelete}:`, err);
         return res.status(500).json({ error: `Failed to delete file: ${err.message}` });
       }
+      
+      // Remove the ISO from the isos.json file
+      try {
+        removeIsoFromJson(filenameToDelete);
+        console.log(`Removed ${filenameToDelete} from isos.json tracking file`);
+      } catch (error) {
+        console.error(`Error removing ISO from isos.json: ${error.message}`);
+        // Continue with the response even if there's an error with isos.json
+      }
+      
       console.log(`Successfully deleted: ${fullPathToDelete}`);
       res.status(200).json({ message: `File '${filenameToDelete}' deleted successfully.` });
     });
@@ -643,10 +828,107 @@ app.delete('/api/iso-archive/:filename', (req, res) => {
   }
 });
 
+// API endpoint to get the isos.json data
+app.get('/api/isos-metadata', (req, res) => {
+  try {
+    const data = readIsosJson();
+    res.json(data);
+  } catch (error) {
+    console.error(`Error reading isos.json: ${error.message}`);
+    res.status(500).json({ error: 'Failed to read ISO metadata.' });
+  }
+});
+
 // Default route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Function to read the isos.json file
+function readIsosJson() {
+  try {
+    if (!fs.existsSync(isosJsonPath)) {
+      // If the file doesn't exist, return an empty object
+      return { isos: [] };
+    }
+    
+    const data = fs.readFileSync(isosJsonPath, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(`Error reading isos.json: ${error.message}`);
+    return { isos: [] }; // Return empty object on error
+  }
+}
+
+// Function to write to the isos.json file
+function writeIsosJson(data) {
+  try {
+    // Ensure the directory exists
+    if (!fs.existsSync(config.isoArchive)) {
+      fs.mkdirSync(config.isoArchive, { recursive: true });
+    }
+    
+    fs.writeFileSync(isosJsonPath, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch (error) {
+    console.error(`Error writing to isos.json: ${error.message}`);
+    return false;
+  }
+}
+
+// Function to add an ISO to the isos.json file
+function addIsoToJson(iso, filename, hash, size) {
+  const data = readIsosJson();
+  
+  // Check if the ISO already exists in the file
+  const existingIndex = data.isos.findIndex(item => item.filename === filename);
+  
+  const isoData = {
+    name: iso.name,
+    filename: filename,
+    version: iso.version || extractVersionFromFilename(filename),
+    hash: hash || '',
+    size: size || 0,
+    addedDate: new Date().toISOString()
+  };
+  
+  if (existingIndex !== -1) {
+    // Update existing entry
+    data.isos[existingIndex] = isoData;
+  } else {
+    // Add new entry
+    data.isos.push(isoData);
+  }
+  
+  return writeIsosJson(data);
+}
+
+// Function to remove an ISO from the isos.json file
+function removeIsoFromJson(filename) {
+  const data = readIsosJson();
+  
+  // Filter out the ISO with the given filename
+  data.isos = data.isos.filter(iso => iso.filename !== filename);
+  
+  return writeIsosJson(data);
+}
+
+// Function to get ISO data from isos.json by filename
+function getIsoDataFromJson(filename) {
+  const data = readIsosJson();
+  return data.isos.find(iso => iso.filename === filename);
+}
+
+// Function to get ISO data from isos.json by normalized name
+function getIsoDataByName(name) {
+  const normalizedName = normalizeIsoName(name);
+  const data = readIsosJson();
+  
+  return data.isos.find(iso => {
+    const isoNormalizedName = normalizeIsoName(iso.name);
+    return isoNormalizedName === normalizedName;
+  });
+}
 
 // Start server
 app.listen(PORT, () => {
