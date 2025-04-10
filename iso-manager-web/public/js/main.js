@@ -395,6 +395,26 @@ IsoManagerApp.prototype.init = function() {
 };
 
 IsoManagerApp.prototype.setupEventListeners = function() {
+  // Settings button
+  var settingsButton = document.getElementById('settingsBtn');
+  if (settingsButton) {
+    settingsButton.addEventListener('click', function() {
+      // TODO: Implement settings modal/view
+      alert('Settings button clicked! Functionality to be implemented.');
+      // Example: this.ui.showSettingsModal(this.state.config);
+    }.bind(this));
+  }
+
+  // Search and Filter
+  const searchInput = document.getElementById('searchInput');
+  const filterSelect = document.getElementById('filterSelect');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => this.filterIsoList());
+  }
+  if (filterSelect) {
+    filterSelect.addEventListener('change', () => this.filterIsoList());
+  }
+
   // Refresh button
   var refreshButton = document.getElementById('refreshBtn');
   if (refreshButton) {
@@ -413,41 +433,6 @@ IsoManagerApp.prototype.setupEventListeners = function() {
         this.loadIsoList(true, urlInput.value);
       }
     }.bind(this));
-  }
-  
-  // Tab switching functionality
-  const tabButtons = document.querySelectorAll('.tab-btn');
-  if (tabButtons.length > 0) {
-    tabButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        // Remove active class from all buttons
-        tabButtons.forEach(btn => {
-          btn.classList.remove('active');
-          btn.classList.remove('border-primary-500');
-          btn.classList.remove('text-primary-400');
-          btn.classList.add('border-transparent');
-        });
-        
-        // Add active class to clicked button
-        button.classList.add('active');
-        button.classList.add('border-primary-500');
-        button.classList.add('text-primary-400');
-        button.classList.remove('border-transparent');
-        
-        // Hide all tab content
-        const tabContents = document.querySelectorAll('.tab-content');
-        tabContents.forEach(content => {
-          content.classList.add('hidden');
-        });
-        
-        // Show the selected tab content
-        const tabName = button.getAttribute('data-tab-button');
-        const selectedTab = document.querySelector(`.tab-content[data-tab-content="${tabName}"]`);
-        if (selectedTab) {
-          selectedTab.classList.remove('hidden');
-        }
-      });
-    });
   }
 };
 
@@ -824,6 +809,10 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
     // Show toast for errors *before* modal creation or fetch call
     self.ui.createToast({ message: `Setup error: ${error.message}`, type: 'error', autoClose: false });
   }
+};
+
+IsoManagerApp.prototype.filterIsoList = function() {
+  // TO DO: implement filtering logic
 };
 
 // Initialize application when DOM is loaded
