@@ -1428,24 +1428,17 @@ export class UI {
      * @param {string} eta - Estimated time remaining
      */
     updateDownloadOverlay(overlayElements, progress, eta) {
-        console.log('DEBUG: updateDownloadOverlay received:', { overlayElements, progress, eta });
-
+        // Simple check for required elements
         if (!overlayElements || !overlayElements.progressText || !overlayElements.etaText) {
             console.error('Cannot update download overlay: Invalid overlay elements');
             return;
         }
 
-        // Update progress text
-        console.log('DEBUG: Before progressText update:', overlayElements.progressText.textContent);
+        // Update progress text - keep it simple
         overlayElements.progressText.textContent = `${Math.floor(progress)}%`;
-        console.log('DEBUG: After progressText update:', overlayElements.progressText.textContent);
 
-        // Update ETA text
-        if (eta) {
-            overlayElements.etaText.textContent = eta;
-        } else {
-            overlayElements.etaText.textContent = 'Calculating...';
-        }
+        // Update ETA text - keep it simple
+        overlayElements.etaText.textContent = eta || 'Calculating...';
     }
 
     /**

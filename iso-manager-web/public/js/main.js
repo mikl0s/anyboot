@@ -712,11 +712,21 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
     .then(function(progressData) {
       console.log('Progress data received:', progressData);
       
+      // Defensive coding - ensure progressData is an object
+      if (!progressData || typeof progressData !== 'object') {
+        console.warn('Invalid progress data received:', progressData);
+        progressData = {}; // Use empty object as fallback
+      }
+      
       // Update download data - use the correct property name from the server response
-      downloadData.progress = progressData.progress || 0;
+      // Ensure progress is a number
+      const progressValue = typeof progressData.progress === 'number' ? progressData.progress : 
+                           (parseFloat(progressData.progress) || 0);
+      downloadData.progress = progressValue;
       
       // If progress is 0 but status is 'downloading', set a minimum progress
-      if (progressData.status === 'downloading' && downloadData.progress === 0) {
+      const status = progressData.status || '';
+      if (status === 'downloading' && downloadData.progress === 0) {
         downloadData.progress = 1; // Set a minimum progress to show activity
       }
       
@@ -726,32 +736,67 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
       var timeRemaining = '';
       
       if (downloadData.progress > 0 && timeElapsed > 0) {
-        // Calculate download speed
-        var totalSize = downloadData.iso.size;
-        var downloadedSize = totalSize * (downloadData.progress / 100);
-        var speedBps = downloadedSize / timeElapsed;
-        speed = self.ui.formatFileSize(speedBps) + '/s';
-        
-        // Calculate time remaining
-        var remainingSize = totalSize - downloadedSize;
-        var remainingSeconds = remainingSize / speedBps;
-        
-        if (remainingSeconds > 60) {
-          var minutes = Math.floor(remainingSeconds / 60);
-          var seconds = Math.floor(remainingSeconds % 60);
-          timeRemaining = `${minutes}m ${seconds}s remaining`;
+        // Ensure iso and size exist and size is a number
+        if (downloadData.iso && typeof downloadData.iso.size === 'number' && downloadData.iso.size > 0) {
+          // Calculate download speed
+          var totalSize = downloadData.iso.size;
+          var downloadedSize = totalSize * (downloadData.progress / 100);
+          var speedBps = downloadedSize / timeElapsed;
+          
+          // Ensure UI and formatFileSize exist
+          if (self.ui && typeof self.ui.formatFileSize === 'function') {
+            speed = self.ui.formatFileSize(speedBps) + '/s';
+          }
+          
+          // Calculate time remaining
+          var remainingSize = totalSize - downloadedSize;
+          var remainingSeconds = remainingSize / speedBps;
+          
+          if (remainingSeconds > 60) {
+            var minutes = Math.floor(remainingSeconds / 60);
+            var seconds = Math.floor(remainingSeconds % 60);
+            timeRemaining = `${minutes}m ${seconds}s remaining`;
+          } else {
+            timeRemaining = `${Math.floor(remainingSeconds)}s remaining`;
+          }
         } else {
-          timeRemaining = `${Math.floor(remainingSeconds)}s remaining`;
+          console.warn('Cannot calculate speed: Invalid ISO size', 
+                      downloadData.iso ? downloadData.iso.size : 'ISO not available');
         }
       }
       
       // Update the progress display on the ISO card
-      if (downloadData.overlayElements) {
+      if (downloadData.overlayElements && downloadData.isoCard) {
         console.log('Updating progress display to:', downloadData.progress + '%');
-        console.log('DEBUG: Calling updateDownloadOverlay with:', { elements: downloadData.overlayElements, progressData }); // Added Log
         
-        // Update the progress and ETA text
-        self.ui.updateDownloadOverlay(downloadData.overlayElements, downloadData.progress, timeRemaining || 'Calculating...');
+        // Try the direct card update approach first
+        const directUpdateSuccess = self.updateCardProgress(
+          downloadData.iso.name,
+          downloadData.progress,
+          timeRemaining || 'Calculating...'
+        );
+        
+        // If direct update fails, try the existing approaches
+        if (!directUpdateSuccess) {
+          // Get direct references to the text elements by their class names within the card
+          const progressTextElement = downloadData.isoCard.querySelector('.download-progress-text');
+          const etaTextElement = downloadData.isoCard.querySelector('.download-eta');
+          
+          if (progressTextElement && etaTextElement) {
+            // Update progress text directly
+            progressTextElement.textContent = `${Math.floor(downloadData.progress)}%`;
+            
+            // Update ETA text directly
+            etaTextElement.textContent = timeRemaining || 'Calculating...';
+            
+            console.log('Direct update completed for progress text:', progressTextElement.textContent);
+          } else {
+            console.error('Progress text elements not found in card');
+            
+            // Fallback to the UI method
+            self.ui.updateDownloadOverlay(downloadData.overlayElements, downloadData.progress, timeRemaining || 'Calculating...');
+          }
+        }
       }
       
       // If download is complete, update the UI
@@ -795,23 +840,55 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
           self.ui.removeDownloadOverlay(downloadData.overlayElements);
         }
       } else {
-        // Continue polling if download is still in progress
+        // --- IMPORTANT: Continue polling for any status that's not 'completed' or 'error' ---
+        console.log(`Continuing to poll download progress for ${downloadId}, current status: ${progressData.status}, progress: ${downloadData.progress}%`);
         setTimeout(function() {
           self.pollDownloadProgress(downloadId);
         }, 1000); // Poll every second
       }
     })
     .catch(function(error) {
-      // Don't log empty error objects as they're just noise
-      if (Object.keys(error).length > 0) {
-        console.error('Error polling download progress:', error);
-      }
+      // Log the full error details to help diagnose the issue
+      console.error('Error polling download progress:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       
-      // Continue polling despite error
+      // --- IMPORTANT: Continue polling despite errors ---
+      console.log(`Continuing to poll download progress after error for ${downloadId}`);
       setTimeout(function() {
         self.pollDownloadProgress(downloadId);
       }, 2000); // Poll every 2 seconds after an error
     });
+};
+
+IsoManagerApp.prototype.updateCardProgress = function(isoName, progress, etaText) {
+  try {
+    // Find the card by iso name
+    const card = document.querySelector(`[data-iso-id="${CSS.escape(isoName)}"]`);
+    if (!card) {
+      console.error(`Card not found for ISO: ${isoName}`);
+      return false;
+    }
+    
+    // Find the progress text and eta elements directly
+    const progressText = card.querySelector('.download-progress-text');
+    const etaTextElement = card.querySelector('.download-eta');
+    
+    if (!progressText || !etaTextElement) {
+      console.error(`Progress elements not found in card for ISO: ${isoName}`);
+      return false;
+    }
+    
+    // Update the text content directly
+    progressText.textContent = `${Math.floor(progress)}%`;
+    etaTextElement.textContent = etaText || 'Calculating...';
+    
+    console.log(`Direct card update: ${isoName} - ${Math.floor(progress)}% - ${etaText}`);
+    return true;
+  } catch (error) {
+    console.error('Error updating card progress:', error);
+    return false;
+  }
 };
 
 IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
