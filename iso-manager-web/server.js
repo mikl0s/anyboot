@@ -395,12 +395,21 @@ app.post('/api/download', async (req, res) => {
     
     // Start the download in the background
     try {
+      // Use the configured ISO archive path if no outputPath is provided
+      const configuredOutputPath = config.isoArchive;
+      
       // Call the iso-manager to download the file
-      const downloadPromise = isoManager.downloadFile(url, outputPath, (progress) => {
-        // Update progress
-        if (downloads[downloadId]) {
-          downloads[downloadId].progress = progress;
-          downloads[downloadId].status = 'downloading';
+      const downloadPromise = isoManager.downloadIso({
+        url,
+        outputPath: outputPath || configuredOutputPath,
+        verify,
+        hashAlgorithm,
+        onProgress: (progressData) => {
+          // Update progress
+          if (downloads[downloadId]) {
+            downloads[downloadId].progress = progressData.percentage || 0;
+            downloads[downloadId].status = 'downloading';
+          }
         }
       });
       

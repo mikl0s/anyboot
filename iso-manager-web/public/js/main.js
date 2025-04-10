@@ -52,7 +52,12 @@ function UIBase() {
     }
     
     toast.className = `toast toast-${type} p-4 rounded shadow-lg flex items-center justify-between`;
-    toast.querySelector('span').textContent = message;
+    toast.innerHTML = `
+      <span>${message}</span>
+      <button class="ml-4 text-gray-400 hover:text-gray-600" onclick="this.parentNode.remove()">
+        <i class="fas fa-times"></i>
+      </button>
+    `;
     
     // Only auto-remove if it's not a persistent toast and duration > 0
     if (!isPersistent && duration > 0) {
@@ -619,6 +624,7 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
       `<div class="flex flex-col w-full">
         <div class="flex justify-between items-center w-full">
           <span>Starting download for ${iso.name}...</span>
+          <span class="text-xs progress-percentage">0%</span>
         </div>
         <div class="mt-2 w-full bg-gray-700 rounded-full h-2.5">
           <div class="download-progress bg-purple-600 h-2.5 rounded-full" style="width: 0%"></div>
@@ -634,8 +640,7 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        url: iso.url,
-        outputPath: iso.name
+        url: iso.url
       })
     })
       .then(function(response) {
@@ -650,7 +655,7 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
           <div class="flex flex-col w-full">
             <div class="flex justify-between items-center w-full">
               <span>Downloading ${iso.name}...</span>
-              <span class="text-xs">0%</span>
+              <span class="text-xs progress-percentage">0%</span>
             </div>
             <div class="mt-2 w-full bg-gray-700 rounded-full h-2.5">
               <div class="download-progress bg-purple-600 h-2.5 rounded-full" style="width: 0%"></div>
@@ -659,7 +664,7 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
         `;
         
         // Update the toast with HTML content
-        toast.querySelector('span').innerHTML = progressHtml;
+        toast.innerHTML = progressHtml;
         
         // Store toast reference for updates
         self.state.activeDownloads.set(downloadInfo.downloadId, { 
@@ -692,7 +697,7 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
   }
   
   // Poll the progress endpoint
-  fetch(`/api/download/progress/${downloadId}`)
+  fetch(`/api/download/${downloadId}`)
     .then(function(response) {
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
@@ -700,8 +705,15 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
       return response.json();
     })
     .then(function(progressData) {
-      // Update download data
+      console.log('Progress data received:', progressData);
+      
+      // Update download data - use the correct property name from the server response
       downloadData.progress = progressData.progress || 0;
+      
+      // If progress is 0 but status is 'downloading', set a minimum progress
+      if (progressData.status === 'downloading' && downloadData.progress === 0) {
+        downloadData.progress = 1; // Set a minimum progress to show activity
+      }
       
       // Calculate time remaining and speed if progress > 0
       var timeElapsed = (new Date() - downloadData.startTime) / 1000; // in seconds
@@ -730,15 +742,26 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
       
       // Update the progress bar and text in the toast
       if (downloadData.toast && downloadData.toast.parentNode) {
-        var progressBar = downloadData.toast.querySelector('.download-progress');
-        var percentText = downloadData.toast.querySelector('.flex.justify-between span:last-child');
+        console.log('Updating progress display to:', downloadData.progress + '%');
         
+        // Get the progress bar and percentage elements
+        var progressBar = downloadData.toast.querySelector('.download-progress');
+        var percentText = downloadData.toast.querySelector('.progress-percentage');
+        
+        // Update the progress bar width
         if (progressBar) {
-          progressBar.style.width = `${downloadData.progress}%`;
+          progressBar.style.width = downloadData.progress + '%';
+          console.log('Set progress bar width to:', downloadData.progress + '%');
+        } else {
+          console.error('Progress bar element not found');
         }
         
+        // Update the percentage text
         if (percentText) {
-          percentText.textContent = `${Math.floor(downloadData.progress)}% ${speed ? '• ' + speed : ''}`;
+          percentText.textContent = Math.floor(downloadData.progress) + '% ' + (speed ? '• ' + speed : '');
+          console.log('Updated percentage text to:', percentText.textContent);
+        } else {
+          console.error('Percentage text element not found');
         }
         
         // Update the main text if we have time remaining info
@@ -752,23 +775,23 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
       
       // If download is complete, update the toast
       if (progressData.status === 'completed') {
-        self.ui.updateToast(
-          downloadData.toast, 
-          `Download of ${downloadData.iso.name} completed successfully!`, 
-          'success', 
-          0,
-          true
-        );
+        // Create a success message
+        var successMessage = `Download of ${downloadData.iso.name} completed successfully!`;
+        console.log('Download completed:', successMessage);
+        
+        // Use the UI class's showToast method
+        self.ui.showToast(successMessage, 'success', 5000, false);
+        
         // Remove from active downloads
         self.state.activeDownloads.delete(downloadId);
       } else if (progressData.status === 'error') {
-        self.ui.updateToast(
-          downloadData.toast, 
-          `Download of ${downloadData.iso.name} failed: ${progressData.error || 'Unknown error'}`, 
-          'error', 
-          0,
-          true
-        );
+        // Create an error message
+        var errorMessage = `Download of ${downloadData.iso.name} failed: ${progressData.error || 'Unknown error'}`;
+        console.log('Download error:', errorMessage);
+        
+        // Use the UI class's showToast method
+        self.ui.showToast(errorMessage, 'error', 5000, false);
+        
         // Remove from active downloads
         self.state.activeDownloads.delete(downloadId);
       } else {
@@ -779,7 +802,10 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
       }
     })
     .catch(function(error) {
-      console.error('Error polling download progress:', error);
+      // Don't log empty error objects as they're just noise
+      if (Object.keys(error).length > 0) {
+        console.error('Error polling download progress:', error);
+      }
       
       // Continue polling despite error
       setTimeout(function() {

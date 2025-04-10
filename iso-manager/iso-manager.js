@@ -919,6 +919,7 @@ function formatSize(bytes) {
 class IsoManager {
   constructor() {
     this.watcher = null;
+    this.events = new (require('events').EventEmitter)();
     this.setupArchiveWatcher();
   }
 
@@ -939,7 +940,7 @@ class IsoManager {
       this.watcher = fs.watch(archivePath, (eventType, filename) => {
         console.log(`Archive event: ${eventType} - ${filename}`);
         if (eventType === 'rename' || eventType === 'change') {
-          this.emit('archive-updated');
+          this.events.emit('archive-updated');
         }
       });
       
@@ -996,29 +997,39 @@ class IsoManager {
       onProgress
     } = params;
     
+    console.log(`Starting download from URL: ${url}`);
+    console.log(`Output path: ${outputPath}`);
+    
     const finalUrl = await this.followRedirects(url);
+    console.log(`Final URL after redirects: ${finalUrl}`);
     const httpModule = finalUrl.startsWith('https:') ? https : http;
     
     // Ensure outputPath exists and is valid
     const finalOutputPath = outputPath || DEFAULT_CONFIG.downloadDir;
     const resolvedOutputPath = path.resolve(finalOutputPath);
     
+    console.log(`Resolved output path: ${resolvedOutputPath}`);
+    
     try {
       await fs.promises.mkdir(resolvedOutputPath, { recursive: true });
+      console.log(`Created or verified directory: ${resolvedOutputPath}`);
     } catch (err) {
+      console.error(`Failed to create download directory: ${err.message}`);
       throw new Error(`Failed to create download directory: ${err.message}`);
     }
     
     const filename = finalUrl.split('/').pop();
     const downloadPath = path.join(resolvedOutputPath, filename);
-    console.log(`Downloading to: ${downloadPath}`);
+    console.log(`Full download path: ${downloadPath}`);
     
     // Create a write stream for the file
+    console.log(`Creating write stream for: ${downloadPath}`);
     const fileStream = fs.createWriteStream(downloadPath);
     
     return new Promise((resolve, reject) => {
       // Error handlers
       fileStream.on('error', (err) => {
+        console.error(`File write error: ${err.message}`);
         reject(new Error(`File write error: ${err.message}`));
       });
       
@@ -1056,6 +1067,9 @@ class IsoManager {
         });
         
         response.pipe(fileStream);
+
+        // Store bytesTransferred in a variable that can be accessed in the finish event
+        fileStream.bytesTransferred = bytesTransferred;
       });
       
       request.on('error', (err) => {
@@ -1063,12 +1077,14 @@ class IsoManager {
         reject(err);
       });
       
-      fileStream.on('finish', () => {
+      fileStream.on('finish', function() {
+        console.log(`Download completed: ${downloadPath}`);
+        console.log(`Bytes transferred: ${this.bytesTransferred || 0}`);
         resolve({
           success: true,
           filePath: downloadPath,
           filename,
-          size: bytesTransferred
+          size: this.bytesTransferred || 0
         });
       });
     });
@@ -1097,7 +1113,7 @@ class IsoManager {
         }
       };
       
-      // Download and verify the file
+      // Download and verify file
       const result = await this.downloadAndVerifyFile({
         url, 
         outputPath: finalOutputPath, 
@@ -1107,9 +1123,12 @@ class IsoManager {
         signal
       });
       
-      // Add duration to result
-      const endTime = Date.now();
-      result.duration = (endTime - startTime) / 1000; // in seconds
+      // Test mode - delete file after verification
+      if (params.testMode && result.success) {
+        console.log('\nTest mode enabled - deleting downloaded file');
+        fs.unlinkSync(result.filePath);
+        console.log(`File deleted: ${result.filePath}`);
+      }
       
       return result;
     } catch (error) {
@@ -1172,7 +1191,6 @@ async function downloadIso(isos, options) {
     const downloadDir = options.downloadDir || path.join(process.cwd(), config.downloadDir || 'ISO-Archive');
     if (!fs.existsSync(downloadDir)) {
       fs.mkdirSync(downloadDir, { recursive: true });
-      console.log(`Created download directory: ${downloadDir}`);
     }
     
     const downloadPath = path.join(downloadDir, filename);
