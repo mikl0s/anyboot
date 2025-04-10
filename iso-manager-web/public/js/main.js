@@ -643,8 +643,8 @@ IsoManagerApp.prototype.loadIsoList = function(forceRefresh, url) {
         // Update ISO grid
         self.isoGrid.loadIsos(isoList);
         
-        // Show success toast
-        self.ui.showToast(`Loaded ${isoList.length} ISOs`, 'success');
+        // Show success toast that auto-disappears
+        self.ui.showToast(`Loaded ${isoList.length} ISOs`, 'success', 3000, false);
       })
       .catch(function(error) {
         console.error('Error loading ISO list:', error);

@@ -58,12 +58,13 @@ export class UI {
             console.log('UI initialized successfully');
             this.initialized = true;
             
-            // Show a welcome toast
+            // Show a welcome toast that auto-disappears after 3 seconds
             this.createToast({
                 type: 'info',
                 title: 'Welcome',
                 message: 'ISO Manager initialized successfully',
-                autoClose: true
+                autoClose: true,
+                autoCloseDelay: 3000
             });
         } catch (error) {
             console.error('Error initializing UI:', error);
