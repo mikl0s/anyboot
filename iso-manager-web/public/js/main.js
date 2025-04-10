@@ -733,8 +733,8 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
 
 IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
   var self = this;
-  console.log('handleVerifyRequest called with ISO:', iso); // <--- NEW LINE ADDED HERE
-  let verificationModal = null; // Define modal variable in the outer scope
+  console.log('handleVerifyRequest called with ISO:', iso); 
+  let verificationModal = null; 
 
   try {
     console.log('Verification requested for:', iso);
@@ -754,7 +754,8 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
       self.ui.createToast({ message: 'Failed to create verification modal.', type: 'error', autoClose: false });
       return;
     }
-    verificationModal.show(); // <--- NEW LINE ADDED HERE
+    verificationModal.show(); 
+    verificationModal.steps.hashStep.updateStatus('pending'); 
 
     // Call the API to verify ISO
     fetch('/api/verify', {
