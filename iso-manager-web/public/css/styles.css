@@ -366,9 +366,8 @@ input[type="checkbox"]:checked::after {
 @keyframes scroll-title {
   0% { transform: translateX(0); }
   10% { transform: translateX(0); } /* Initial pause */
-  60% { transform: translateX(calc(-100% + 200px)); } /* Scroll to end */
-  70% { transform: translateX(calc(-100% + 200px)); } /* Pause at end */
-  100% { transform: translateX(0); } /* Return to start */
+  90% { transform: translateX(calc(-100% + 200px)); } /* Scroll to end */
+  100% { transform: translateX(calc(-100% + 200px)); } /* End position */
 }
 
 .iso-card .title-container {
@@ -383,8 +382,8 @@ input[type="checkbox"]:checked::after {
   white-space: nowrap;
 }
 
-.iso-card:hover .scrolling-title.needs-scrolling {
-  animation: scroll-title 10s linear infinite;
+.iso-card:hover .scrolling-title {
+  animation: scroll-title 2s ease-out forwards;
 }
 
 /* Responsive adjustments */
