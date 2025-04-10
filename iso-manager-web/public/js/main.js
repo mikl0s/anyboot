@@ -3,132 +3,8 @@
  * Coordinates all components and handles the main application logic
  */
 
-// Simple UI helper class
-function UIBase() {
-  this.showToast = function(message, type, duration, isPersistent) {
-    console.log(`[${type}] ${message}`);
-    var toastContainer = document.getElementById('toastContainer');
-    if (!toastContainer) {
-      console.warn('Toast container not found!');
-      return null;
-    }
-    
-    // For download toasts, use the special download type
-    if (isPersistent) {
-      type = 'download';
-    }
-    
-    var toast = document.createElement('div');
-    toast.className = `toast toast-${type} p-4 rounded shadow-lg flex items-center justify-between`;
-    toast.innerHTML = `
-      <span>${message}</span>
-      <button class="ml-4 text-gray-400 hover:text-gray-600" onclick="this.parentNode.remove()">
-        <i class="fas fa-times"></i>
-      </button>
-    `;
-    
-    toastContainer.appendChild(toast);
-    
-    // Only auto-remove if it's not a persistent toast and duration > 0
-    if (!isPersistent && duration > 0) {
-      setTimeout(function() {
-        if (toast.parentNode) {
-          toast.remove();
-        }
-      }, duration);
-    }
-    
-    return toast;
-  };
-  
-  this.updateToast = function(toast, message, type, duration, isPersistent) {
-    if (!toast || !toast.parentNode) {
-      return this.showToast(message, type, duration, isPersistent);
-    }
-    
-    // For download toasts, use the special download type
-    if (isPersistent) {
-      type = 'download';
-    }
-    
-    toast.className = `toast toast-${type} p-4 rounded shadow-lg flex items-center justify-between`;
-    toast.innerHTML = `
-      <span>${message}</span>
-      <button class="ml-4 text-gray-400 hover:text-gray-600" onclick="this.parentNode.remove()">
-        <i class="fas fa-times"></i>
-      </button>
-    `;
-    
-    // Only auto-remove if it's not a persistent toast and duration > 0
-    if (!isPersistent && duration > 0) {
-      setTimeout(function() {
-        if (toast.parentNode) {
-          toast.remove();
-        }
-      }, duration);
-    }
-    
-    return toast;
-  };
-  
-  this.formatFileSize = function(bytes) {
-    if (!bytes || bytes === 0) return 'Unknown size';
-    
-    var units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    var size = bytes;
-    var unitIndex = 0;
-    
-    while (size >= 1024 && unitIndex < units.length - 1) {
-      size /= 1024;
-      unitIndex++;
-    }
-    
-    return `${size.toFixed(2)} ${units[unitIndex]}`;
-  };
-  
-  this.createDownloadOverlay = function(isoCard, iso) {
-    const overlay = document.createElement('div');
-    overlay.className = 'iso-card-download-overlay';
-    overlay.innerHTML = `
-      <svg class="download-spinner" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2Z" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 3"/>
-        <path d="M12 2C6.47715 2 2 6.47715 2 12" stroke="#0ea5e9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <div class="download-progress-text">0%</div>
-      <div class="download-eta">Preparing download...</div>
-    `;
-    
-    isoCard.appendChild(overlay);
-    
-    return {
-      overlay,
-      progressText: overlay.querySelector('.download-progress-text'),
-      etaText: overlay.querySelector('.download-eta')
-    };
-  };
-  
-  this.removeDownloadOverlay = function(overlayElements) {
-    if (overlayElements.overlay && overlayElements.overlay.parentNode) {
-      overlayElements.overlay.parentNode.removeChild(overlayElements.overlay);
-    }
-  };
-  
-  this.updateDownloadOverlay = function(overlayElements, progress, eta) {
-    if (overlayElements && overlayElements.progressText && overlayElements.progressText.parentNode) {
-      console.log('Updating progress display to:', progress + '%');
-      
-      // Update the progress text
-      overlayElements.progressText.textContent = `${Math.floor(progress)}%`;
-      
-      // Update the ETA text
-      if (eta) {
-        overlayElements.etaText.textContent = eta;
-      } else {
-        overlayElements.etaText.textContent = 'Calculating...';
-      }
-    }
-  };
-}
+// Import the UI class
+import { UI } from './ui.js';
 
 // Simple ISO Grid class
 function IsoGrid(containerId, downloadHandler, verifyHandler) {
@@ -458,7 +334,8 @@ function loadOsListMapping() {
 // Simple class for handling ISO list
 function IsoManagerApp() {
   // Initialize UI components
-  this.ui = new UIBase();
+  this.ui = new UI();
+  this.ui.init();
   
   // Create ISO grid
   this.isoGrid = new IsoGrid(
@@ -504,11 +381,16 @@ IsoManagerApp.prototype.init = function() {
     this.loadIsoList();
     
     // Show success toast that auto-disappears
-    this.ui.showToast('Application initialized successfully', 'success', 3000, false);
+    this.ui.createToast({
+      message: 'Application initialized successfully',
+      type: 'success',
+      autoClose: true,
+      autoCloseDelay: 3000
+    });
   } catch (error) {
     console.error('Error initializing application:', error);
     this.isoGrid.showError(`Failed to initialize application: ${error.message}`);
-    this.ui.showToast(`Initialization error: ${error.message}`, 'error');
+    this.ui.createToast({ message: `Initialization error: ${error.message}`, type: 'error', autoClose: false });
   }
 };
 
@@ -640,17 +522,22 @@ IsoManagerApp.prototype.loadIsoList = function(forceRefresh, url) {
         self.isoGrid.loadIsos(isoList);
         
         // Show success toast that auto-disappears
-        self.ui.showToast(`Loaded ${isoList.length} ISOs`, 'success', 3000, false);
+        self.ui.createToast({
+          message: `Loaded ${isoList.length} ISOs`,
+          type: 'success',
+          autoClose: true,
+          autoCloseDelay: 3000
+        });
       })
       .catch(function(error) {
         console.error('Error loading ISO list:', error);
         self.isoGrid.showError(`Failed to load ISO list: ${error.message}`);
-        self.ui.showToast(`Error loading ISO list: ${error.message}`, 'error');
+        self.ui.createToast({ message: `Error loading ISO list: ${error.message}`, type: 'error', autoClose: false });
       });
   } catch (error) {
     console.error('Error in loadIsoList:', error);
     this.isoGrid.showError(`Error: ${error.message}`);
-    this.ui.showToast(`Error: ${error.message}`, 'error');
+    this.ui.createToast({ message: `Error: ${error.message}`, type: 'error', autoClose: false });
   }
 };
 
@@ -660,10 +547,12 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
     console.log('Download requested for:', iso);
     
     // Show a simple toast notification that download has started
-    this.ui.showToast(
-      `Download started for ${iso.name}`,
-      'info', 3000, false
-    );
+    this.ui.createToast({
+      message: `Download started for ${iso.name}`,
+      type: 'info',
+      autoClose: true,
+      autoCloseDelay: 3000
+    });
     
     // Find the ISO card in the DOM
     const isoCard = document.querySelector(`[data-iso-id="${iso.name}"]`);
@@ -709,15 +598,15 @@ IsoManagerApp.prototype.handleDownloadRequest = function(iso) {
         }
         
         // Show error toast
-        self.ui.showToast(`Download error: ${error.message}`, 'error', 5000, false);
+        self.ui.createToast({ message: `Download error: ${error.message}`, type: 'error', autoClose: false });
       });
     } else {
       console.error('ISO card not found in DOM for:', iso.name);
-      this.ui.showToast(`Could not find ISO card for ${iso.name}`, 'error', 5000, false);
+      this.ui.createToast({ message: `Could not find ISO card for ${iso.name}`, type: 'error', autoClose: false });
     }
   } catch (error) {
     console.error('Error handling download request:', error);
-    this.ui.showToast(`Download error: ${error.message}`, 'error', 5000, false);
+    this.ui.createToast({ message: `Download error: ${error.message}`, type: 'error', autoClose: false });
   }
 };
 
@@ -789,7 +678,12 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
         console.log('Download completed:', successMessage);
         
         // Show success toast
-        self.ui.showToast(successMessage, 'success', 5000, false);
+        self.ui.createToast({
+          message: successMessage,
+          type: 'success',
+          autoClose: true,
+          autoCloseDelay: 5000
+        });
         
         // Remove from active downloads
         self.state.activeDownloads.delete(downloadId);
@@ -804,7 +698,11 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
         console.log('Download error:', errorMessage);
         
         // Show error toast
-        self.ui.showToast(errorMessage, 'error', 5000, false);
+        self.ui.createToast({
+          message: errorMessage,
+          type: 'error',
+          autoClose: false
+        });
         
         // Remove from active downloads
         self.state.activeDownloads.delete(downloadId);
@@ -835,6 +733,7 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
 
 IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
   var self = this;
+  console.log('handleVerifyRequest called with ISO:', iso); // <--- NEW LINE ADDED HERE
   let verificationModal = null; // Define modal variable in the outer scope
 
   try {
@@ -852,14 +751,10 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
     verificationModal = self.ui.createVerificationModal(iso);
     if (!verificationModal || !verificationModal.steps || !verificationModal.modal) {
       console.error('Failed to create verification modal or modal structure is invalid.');
-      self.ui.showToast('Failed to create verification modal.', 'error', 5000, false);
+      self.ui.createToast({ message: 'Failed to create verification modal.', type: 'error', autoClose: false });
       return;
     }
-
-    // Update the file step to success immediately
-    verificationModal.steps.fileStep.updateStatus('success');
-    verificationModal.steps.fileStep.updateDetails(`Using file at: ${iso.path}`);
-    // --- End UI.js modal creation --- 
+    verificationModal.show(); // <--- NEW LINE ADDED HERE
 
     // Call the API to verify ISO
     fetch('/api/verify', {
@@ -898,25 +793,15 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
       const hashDisplay = result.hash || 'N/A';
       verificationModal.steps.hashStep.updateDetails(`Calculated ${algorithm}: ${hashDisplay}`);
 
-      const modalTitle = verificationModal.modal.querySelector('.verification-modal-title');
-
       if (result.isValid) {
         verificationModal.steps.compareStep.updateStatus('success');
         verificationModal.steps.compareStep.updateDetails('Hash values match. The ISO is authentic.');
-        if (modalTitle) {
-          modalTitle.textContent = `${iso.name} verified successfully`;
-          modalTitle.style.color = 'var(--color-accent3-500)'; 
-        }
       } else {
         verificationModal.steps.compareStep.updateStatus('error');
         const expectedHash = result.expectedHash || 'Not provided';
         verificationModal.steps.compareStep.updateDetails(
           `Hashes do not match!\nExpected: ${expectedHash}\nActual:   ${hashDisplay}`
         );
-        if (modalTitle) {
-          modalTitle.textContent = `Verification failed for ${iso.name}`;
-          modalTitle.style.color = 'var(--color-accent2-500)'; 
-        }
       }
       // --- End modal update --- 
     })
@@ -930,19 +815,13 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
         verificationModal.steps.hashStep.updateDetails('Failed during hash calculation or comparison.');
         verificationModal.steps.compareStep.updateStatus('error');
         verificationModal.steps.compareStep.updateDetails(`Error: ${error.message}`);
-
-        const modalTitle = verificationModal.modal.querySelector('.verification-modal-title');
-        if (modalTitle) {
-          modalTitle.textContent = `Verification error for ${iso.name}`;
-          modalTitle.style.color = 'var(--color-accent2-500)'; 
-        }
       }
       // --- End modal error update --- 
     }); // End of fetch promise chain
   } catch (error) {
     console.error('Error setting up verification request:', error);
     // Show toast for errors *before* modal creation or fetch call
-    self.ui.showToast(`Setup error: ${error.message}`, 'error', 5000, false);
+    self.ui.createToast({ message: `Setup error: ${error.message}`, type: 'error', autoClose: false });
   }
 };
 

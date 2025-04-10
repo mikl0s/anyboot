@@ -984,7 +984,7 @@ export class UI {
             const date = new Date(item.date).toLocaleString();
             
             historyItem.innerHTML = `
-                <div class="flex justify-between items-start">
+                <div class="flex items-center justify-between">
                     <div>
                         <h4 class="text-white font-medium">${item.filename}</h4>
                         <p class="text-gray-400 text-sm">${date}</p>
@@ -1209,229 +1209,164 @@ export class UI {
      */
     createVerificationModal(iso) {
         try {
-            // Create backdrop
+            // Create modal backdrop
             const backdrop = document.createElement('div');
-            backdrop.className = 'verification-modal-backdrop';
-            document.body.appendChild(backdrop);
-            
-            // Create modal
+            backdrop.className = 'fixed inset-0 bg-slate-900 bg-opacity-75 flex items-center justify-center z-50 hidden';
+            backdrop.id = `verification-modal-backdrop-${iso.name.replace(/\s+/g, '-')}`;
+
+            // Create modal container
             const modal = document.createElement('div');
-            modal.className = 'verification-modal';
-            
-            // Create header
-            const header = document.createElement('div');
-            header.className = 'verification-modal-header';
-            
-            const title = document.createElement('h3');
-            title.className = 'verification-modal-title';
-            title.textContent = `Verifying ${iso.name}`;
-            
-            const closeButton = document.createElement('button');
-            closeButton.className = 'verification-modal-close';
-            closeButton.innerHTML = '<i class="fas fa-times"></i>';
-            closeButton.addEventListener('click', () => {
-                this.closeVerificationModal({ modal, backdrop });
-            });
-            
-            header.appendChild(title);
-            header.appendChild(closeButton);
-            
-            // Create body
-            const body = document.createElement('div');
-            body.className = 'verification-modal-body';
-            
-            // Create steps
-            const fileStep = this.createVerificationStep('Locating ISO file', 'pending');
-            const hashStep = this.createVerificationStep('Calculating hash', 'pending');
-            const compareStep = this.createVerificationStep('Comparing hash values', 'pending');
-            
-            body.appendChild(fileStep.element);
-            body.appendChild(hashStep.element);
-            body.appendChild(compareStep.element);
-            
-            // Create footer
-            const footer = document.createElement('div');
-            footer.className = 'verification-modal-footer';
-            
-            const closeModalButton = document.createElement('button');
-            closeModalButton.className = 'verification-modal-button primary';
-            closeModalButton.textContent = 'Close';
-            closeModalButton.addEventListener('click', () => {
-                this.closeVerificationModal({ modal, backdrop });
-            });
-            
-            footer.appendChild(closeModalButton);
-            
-            // Assemble modal
-            modal.appendChild(header);
-            modal.appendChild(body);
-            modal.appendChild(footer);
-            
-            document.body.appendChild(modal);
-            
-            // Return modal elements and update methods
-            return {
-                modal,
-                backdrop,
-                steps: {
-                    fileStep,
-                    hashStep,
-                    compareStep
-                },
-                close: () => this.closeVerificationModal({ modal, backdrop })
+            modal.className = 'relative bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-md transform transition-all duration-300 ease-out scale-95 opacity-0'; // Added 'relative' for positioning the X button
+            modal.innerHTML = `
+                <button class="absolute top-3 right-3 text-slate-400 hover:text-slate-100 text-2xl leading-none close-x-btn" aria-label="Close">&times;</button>
+                <h3 class="text-xl font-semibold text-slate-100 mb-4 verification-modal-title">Verifying ${iso.name}</h3>
+                
+                <!-- Step Indicators -->
+                <div class="flex items-center justify-between mb-6 space-x-4">
+                    <div class="flex items-center verification-step" data-step="hash">
+                    <div class="step-icon w-8 h-8 rounded-full bg-slate-600 border-2 border-slate-500 flex items-center justify-center text-slate-300 mr-2 transition-colors duration-300">1</div>
+                    <span class="step-label text-sm text-slate-400 transition-colors duration-300">Calculate Hash</span>
+                    </div>
+                    <div class="flex-1 h-px bg-slate-600"></div> <!-- Connector -->
+                    <div class="flex items-center verification-step" data-step="compare">
+                    <div class="step-icon w-8 h-8 rounded-full bg-slate-600 border-2 border-slate-500 flex items-center justify-center text-slate-300 mr-2 transition-colors duration-300">2</div>
+                    <span class="step-label text-sm text-slate-400 transition-colors duration-300">Compare</span>
+                    </div>
+                </div>
+
+                <!-- Step Details Container (Flex, min-height) -->
+                <div class="mb-4 flex flex-col space-y-2" style="min-height: 80px;"> <!-- Added flex container and min-height -->
+                    <div class="verification-step-details hash-details p-3 bg-slate-700 rounded flex-grow hidden"> <!-- Added flex-grow -->
+                        <p class="text-sm text-slate-300">Calculating hash...</p>
+                    </div>
+                    <div class="verification-step-details compare-details p-3 bg-slate-700 rounded flex-grow hidden"> <!-- Added flex-grow -->
+                        <p class="text-sm text-slate-300">Comparing hash values...</p>
+                    </div>
+                </div>
+
+                <!-- REMOVED Close button from here -->
+            `;
+
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+
+            // Define hideModal function earlier
+            const hideModal = () => {
+                if (!backdrop) return;
+                // Start fade-out animation
+                modal.classList.remove('scale-100', 'opacity-100');
+                modal.classList.add('scale-95', 'opacity-0');
+                backdrop.classList.add('opacity-0');
+
+                // Remove after animation completes
+                setTimeout(() => {
+                    if (backdrop && backdrop.parentNode) {
+                        backdrop.parentNode.removeChild(backdrop);
+                    }
+                }, 300); // Match duration-300
             };
+
+            // Step elements references
+            const steps = {
+                hashStep: {
+                    element: backdrop.querySelector('.verification-step[data-step="hash"]'),
+                    icon: backdrop.querySelector('.verification-step[data-step="hash"] .step-icon'),
+                    label: backdrop.querySelector('.verification-step[data-step="hash"] .step-label'),
+                    detailsElement: backdrop.querySelector('.hash-details'),
+                    updateStatus: function(status) { /* pending, success, error */
+                        this.icon.classList.remove('bg-slate-600', 'bg-green-500', 'bg-red-500', 'border-slate-500', 'border-green-700', 'border-red-700');
+                        this.label.classList.remove('text-slate-400', 'text-green-300', 'text-red-300');
+                        this.detailsElement.classList.remove('hidden');
+                        if (status === 'success') {
+                            this.icon.classList.add('bg-green-500', 'border-green-700');
+                            this.label.classList.add('text-green-300');
+                            this.icon.textContent = '\u2714'; // Checkmark
+                        } else if (status === 'error') {
+                            this.icon.classList.add('bg-red-500', 'border-red-700');
+                            this.label.classList.add('text-red-300');
+                            this.icon.textContent = '\u2718'; // X mark
+                        } else { // pending
+                            this.icon.classList.add('bg-slate-600', 'border-slate-500');
+                            this.label.classList.add('text-slate-400');
+                            this.icon.textContent = '1';
+                            this.detailsElement.classList.add('hidden');
+                        }
+                    },
+                    updateDetails: function(text) {
+                        this.detailsElement.querySelector('p').textContent = text;
+                        this.detailsElement.classList.remove('hidden');
+                    }
+                },
+                compareStep: {
+                    element: backdrop.querySelector('.verification-step[data-step="compare"]'),
+                    icon: backdrop.querySelector('.verification-step[data-step="compare"] .step-icon'),
+                    label: backdrop.querySelector('.verification-step[data-step="compare"] .step-label'),
+                    detailsElement: backdrop.querySelector('.compare-details'),
+                    updateStatus: function(status) {
+                        this.icon.classList.remove('bg-slate-600', 'bg-green-500', 'bg-red-500', 'border-slate-500', 'border-green-700', 'border-red-700');
+                        this.label.classList.remove('text-slate-400', 'text-green-300', 'text-red-300');
+                        this.detailsElement.classList.remove('hidden');
+                        if (status === 'success') {
+                            this.icon.classList.add('bg-green-500', 'border-green-700');
+                            this.label.classList.add('text-green-300');
+                            this.icon.textContent = '\u2714'; // Checkmark
+                        } else if (status === 'error') {
+                            this.icon.classList.add('bg-red-500', 'border-red-700');
+                            this.label.classList.add('text-red-300');
+                            this.icon.textContent = '\u2718'; // X mark
+                        } else {
+                            this.icon.classList.add('bg-slate-600', 'border-slate-500');
+                            this.label.classList.add('text-slate-400');
+                            this.icon.textContent = '2';
+                            this.detailsElement.classList.add('hidden');
+                        }
+                    },
+                    updateDetails: function(text) {
+                        this.detailsElement.querySelector('p').textContent = text;
+                        this.detailsElement.classList.remove('hidden');
+                    }
+                }
+            };
+
+            // Add event listeners after defining hideModal
+            // Close button functionality (X button)
+            const closeXButton = modal.querySelector('.close-x-btn');
+            if (closeXButton) { // Check if button exists
+                closeXButton.addEventListener('click', hideModal);
+            } else {
+                console.warn('Verification modal X close button not found.');
+            }
+
+            // Close modal when clicking backdrop
+            if (backdrop) { // Check if backdrop exists
+                backdrop.addEventListener('click', (event) => {
+                    if (event.target === backdrop) { // Check if the click was directly on the backdrop
+                        hideModal();
+                    }
+                });
+            } else {
+                console.warn('Verification modal backdrop not found for click listener.');
+            }
+
+            const modalObject = {
+                modal: modal,
+                backdrop: backdrop,
+                steps: steps,
+                hide: hideModal, // Keep the hide method
+                show: () => {     // <-- ADD THIS show METHOD
+                    backdrop.classList.remove('hidden');
+                    // Trigger the transition classes removal slightly after display to ensure animation works
+                    requestAnimationFrame(() => {
+                        modal.classList.remove('scale-95', 'opacity-0');
+                    });
+                }
+            };
+
+            return modalObject;
         } catch (error) {
             console.error('Error creating verification modal:', error);
             return null;
         }
-    }
-    
-    /**
-     * Create a verification step element
-     * @param {string} title - Step title
-     * @param {string} status - Step status (pending, success, error)
-     * @param {string} details - Optional step details
-     * @returns {Object} - Step element and update methods
-     */
-    createVerificationStep(title, status = 'pending', details = '') {
-        const step = document.createElement('div');
-        step.className = `verification-step ${status}`;
-        
-        const iconContainer = document.createElement('div');
-        iconContainer.className = 'verification-step-icon';
-        
-        let icon = '';
-        if (status === 'pending') {
-            icon = '<i class="fas fa-spinner fa-spin"></i>';
-        } else if (status === 'success') {
-            icon = '<i class="fas fa-check-circle text-accent3-500"></i>';
-        } else if (status === 'error') {
-            icon = '<i class="fas fa-times-circle text-accent2-500"></i>';
-        }
-        
-        iconContainer.innerHTML = icon;
-        
-        const content = document.createElement('div');
-        content.className = 'verification-step-content';
-        
-        const titleElement = document.createElement('div');
-        titleElement.className = 'verification-step-title';
-        titleElement.textContent = title;
-        
-        const detailsElement = document.createElement('div');
-        detailsElement.className = 'verification-step-details';
-        detailsElement.textContent = details;
-        
-        content.appendChild(titleElement);
-        if (details) {
-            content.appendChild(detailsElement);
-        }
-        
-        step.appendChild(iconContainer);
-        step.appendChild(content);
-        
-        return {
-            element: step,
-            iconContainer,
-            titleElement,
-            detailsElement,
-            updateStatus: (newStatus) => {
-                step.className = `verification-step ${newStatus}`;
-                
-                let newIcon = '';
-                if (newStatus === 'pending') {
-                    newIcon = '<i class="fas fa-spinner fa-spin"></i>';
-                } else if (newStatus === 'success') {
-                    newIcon = '<i class="fas fa-check-circle text-accent3-500"></i>';
-                } else if (newStatus === 'error') {
-                    newIcon = '<i class="fas fa-times-circle text-accent2-500"></i>';
-                }
-                
-                iconContainer.innerHTML = newIcon;
-            },
-            updateDetails: (newDetails) => {
-                detailsElement.textContent = newDetails;
-                if (newDetails) {
-                    content.appendChild(detailsElement);
-                } else {
-                    if (detailsElement.parentNode === content) {
-                        content.removeChild(detailsElement);
-                    }
-                }
-            }
-        };
-    }
-    
-    /**
-     * Close the verification modal
-     * @param {Object} modal - Modal elements
-     */
-    closeVerificationModal({ modal, backdrop }) {
-        if (modal && modal.parentNode) {
-            modal.parentNode.removeChild(modal);
-        }
-        
-        if (backdrop && backdrop.parentNode) {
-            backdrop.parentNode.removeChild(backdrop);
-        }
-    }
-
-    /**
-     * Show a success message
-     * @param {string} message - Message to show
-     */
-    showSuccess(message) {
-        this.createToast({
-            type: 'success',
-            title: 'Success',
-            message: message
-        });
-    }
-    
-    /**
-     * Show an error message
-     * @param {string} message - Error message to show
-     */
-    showError(message) {
-        this.createToast({
-            type: 'error',
-            title: 'Error',
-            message: message,
-            autoClose: false // Errors should stay visible
-        });
-    }
-
-    // Apply modern styling to UI elements
-    applyModernStyling() {
-        // Apply modern card styling
-        const cards = document.querySelectorAll('.iso-card');
-        cards.forEach(card => {
-            card.classList.add('bg-slate-800', 'border', 'border-slate-700', 'hover:border-primary-400', 'transition-all', 'duration-300', 'shadow-lg', 'rounded-lg', 'overflow-hidden');
-        });
-        
-        // Style buttons
-        const buttons = document.querySelectorAll('.btn');
-        buttons.forEach(button => {
-            if (button.classList.contains('btn-primary')) {
-                button.classList.add('bg-primary-600', 'hover:bg-primary-700', 'text-white', 'transition-all', 'duration-200');
-            } else if (button.classList.contains('btn-secondary')) {
-                button.classList.add('bg-slate-700', 'hover:bg-slate-600', 'text-white', 'transition-all', 'duration-200');
-            }
-        });
-        
-        // Style badges
-        const badges = document.querySelectorAll('.badge');
-        badges.forEach(badge => {
-            badge.classList.add('text-xs', 'font-medium', 'py-1', 'px-2.5', 'rounded-full');
-            
-            if (badge.classList.contains('badge-success')) {
-                badge.classList.add('bg-accent3-400', 'text-white');
-            } else if (badge.classList.contains('badge-warning')) {
-                badge.classList.add('bg-yellow-500', 'text-white');
-            } else if (badge.classList.contains('badge-info')) {
-                badge.classList.add('bg-primary-400', 'text-white');
-            }
-        });
     }
 
     /**
@@ -1505,5 +1440,63 @@ export class UI {
         if (overlayElements.overlay.parentNode) {
             overlayElements.overlay.parentNode.removeChild(overlayElements.overlay);
         }
+    }
+
+    // Apply modern styling to UI elements
+    applyModernStyling() {
+        // Apply modern card styling
+        const cards = document.querySelectorAll('.iso-card');
+        cards.forEach(card => {
+            card.classList.add('bg-slate-800', 'border', 'border-slate-700', 'hover:border-primary-400', 'transition-all', 'duration-300', 'shadow-lg', 'rounded-lg', 'overflow-hidden');
+        });
+        
+        // Style buttons
+        const buttons = document.querySelectorAll('.btn');
+        buttons.forEach(button => {
+            if (button.classList.contains('btn-primary')) {
+                button.classList.add('bg-primary-600', 'hover:bg-primary-700', 'text-white', 'transition-all', 'duration-200');
+            } else if (button.classList.contains('btn-secondary')) {
+                button.classList.add('bg-slate-700', 'hover:bg-slate-600', 'text-white', 'transition-all', 'duration-200');
+            }
+        });
+        
+        // Style badges
+        const badges = document.querySelectorAll('.badge');
+        badges.forEach(badge => {
+            badge.classList.add('text-xs', 'font-medium', 'py-1', 'px-2.5', 'rounded-full');
+            
+            if (badge.classList.contains('badge-success')) {
+                badge.classList.add('bg-accent3-400', 'text-white');
+            } else if (badge.classList.contains('badge-warning')) {
+                badge.classList.add('bg-yellow-500', 'text-white');
+            } else if (badge.classList.contains('badge-info')) {
+                badge.classList.add('bg-primary-400', 'text-white');
+            }
+        });
+    }
+
+    /**
+     * Show a success message
+     * @param {string} message - Message to show
+     */
+    showSuccess(message) {
+        this.createToast({
+            type: 'success',
+            title: 'Success',
+            message: message
+        });
+    }
+    
+    /**
+     * Show an error message
+     * @param {string} message - Error message to show
+     */
+    showError(message) {
+        this.createToast({
+            type: 'error',
+            title: 'Error',
+            message: message,
+            autoClose: false // Errors should stay visible
+        });
     }
 }
