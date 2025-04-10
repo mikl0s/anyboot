@@ -346,6 +346,9 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
               });
             }
             
+            // Store the ISO name for tracking the update process
+            const isoBeingUpdated = specificIso.name;
+            
             // Delete the old file first
             fetch(`/api/iso-archive/${encodeURIComponent(oldFilename)}`, {
               method: 'DELETE',
@@ -358,6 +361,17 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
             })
             .then(data => {
               console.log('Old version deleted successfully, downloading new version');
+              
+              // Store reference to the card and ISO for updating after download
+              if (window.app) {
+                // Save the update info in the app state
+                window.app.updateInfo = {
+                  isBeingUpdated: true,
+                  isoObject: specificIso,
+                  cardElement: card
+                };
+              }
+              
               // Now download the new version
               this.downloadHandler(specificIso);
             })
@@ -505,14 +519,6 @@ IsoManagerApp.prototype.init = function() {
     
     // Load ISO list
     this.loadIsoList();
-    
-    // Show success toast that auto-disappears
-    this.ui.createToast({
-      message: 'Application initialized successfully',
-      type: 'success',
-      autoClose: true,
-      autoCloseDelay: 3000
-    });
   } catch (error) {
     console.error('Error initializing application:', error);
     this.isoGrid.showError(`Failed to initialize application: ${error.message}`);
@@ -889,8 +895,79 @@ IsoManagerApp.prototype.pollDownloadProgress = function(downloadId) {
           // Update the ISO object to indicate it's now downloaded
           downloadData.iso.inArchive = true;
           
-          // Re-create the card with updated state
-          self.isoGrid.updateIsoCard(downloadData.iso);
+          // Check if this was an update operation
+          if (self.updateInfo && self.updateInfo.isBeingUpdated && 
+              self.updateInfo.isoObject && self.updateInfo.isoObject.name === downloadData.iso.name) {
+            
+            console.log('This was an update operation, refreshing card to show new status');
+            
+            // Get the card element
+            const cardElement = self.updateInfo.cardElement || downloadData.isoCard;
+            
+            // Get the new filename from the result
+            const newFilename = progressData.result && progressData.result.filePath ? 
+                               progressData.result.filePath.split('/').pop() : null;
+            
+            if (newFilename) {
+              console.log(`Updating card with new filename: ${newFilename}`);
+              // Update the card's dataset with the new filename
+              cardElement.dataset.isoFilename = newFilename;
+              // Also update the ISO object
+              downloadData.iso.filename = newFilename;
+            }
+            
+            // DIRECT DOM MANIPULATION - this is more reliable than updateIsoCard
+            // Find the update button and change it to verify button
+            const actionButton = cardElement.querySelector('.update-button');
+            if (actionButton) {
+              console.log('Found update button to change to verify button');
+              
+              // Change button appearance
+              actionButton.classList.remove('update-button', 'bg-accent2-500', 'hover:bg-accent2-600');
+              actionButton.classList.add('verify-button', 'bg-accent3-500', 'hover:bg-accent3-600');
+              
+              // Update icon and text
+              const icon = actionButton.querySelector('i');
+              const text = actionButton.querySelector('span');
+              if (icon) icon.className = 'fas fa-check-circle mr-1.5';
+              if (text) text.textContent = 'Verify';
+              
+              // Update the button's event listener to call verifyHandler instead of updateHandler
+              actionButton.replaceWith(actionButton.cloneNode(true));
+              const newButton = cardElement.querySelector('.verify-button');
+              if (newButton) {
+                newButton.addEventListener('click', function(e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  self.isoGrid.verifyHandler(downloadData.iso);
+                });
+              }
+              
+              // Make sure delete button is visible and has the correct filename
+              const deleteButton = cardElement.querySelector('.delete-iso-button');
+              if (deleteButton) {
+                deleteButton.classList.remove('hidden');
+                // Update delete button event listener with new filename
+                deleteButton.replaceWith(deleteButton.cloneNode(true));
+                const newDeleteButton = cardElement.querySelector('.delete-iso-button');
+                if (newDeleteButton && newFilename) {
+                  newDeleteButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    self.isoGrid.deleteHandler(newFilename, cardElement);
+                  });
+                }
+              }
+            } else {
+              console.warn('Could not find update button to change');
+            }
+            
+            // Clear the update info
+            self.updateInfo = null;
+          } else {
+            // Regular download completion - use the standard method
+            self.isoGrid.updateIsoCard(downloadData.iso);
+          }
         }
       } else if (progressData.status === 'error') {
         // Create an error message

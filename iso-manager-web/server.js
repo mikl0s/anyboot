@@ -880,8 +880,16 @@ function writeIsosJson(data) {
 function addIsoToJson(iso, filename, hash, size) {
   const data = readIsosJson();
   
-  // Check if the ISO already exists in the file
-  const existingIndex = data.isos.findIndex(item => item.filename === filename);
+  // Normalize the ISO name for comparison
+  const normalizedName = normalizeIsoName(iso.name);
+  
+  // Check if the ISO already exists in the file by filename
+  let existingIndex = data.isos.findIndex(item => item.filename === filename);
+  
+  // If not found by filename, check by normalized name to handle updates
+  if (existingIndex === -1) {
+    existingIndex = data.isos.findIndex(item => normalizeIsoName(item.name) === normalizedName);
+  }
   
   const isoData = {
     name: iso.name,
@@ -895,9 +903,11 @@ function addIsoToJson(iso, filename, hash, size) {
   if (existingIndex !== -1) {
     // Update existing entry
     data.isos[existingIndex] = isoData;
+    console.log(`Updated existing ISO in isos.json: ${iso.name} (${filename})`);
   } else {
     // Add new entry
     data.isos.push(isoData);
+    console.log(`Added new ISO to isos.json: ${iso.name} (${filename})`);
   }
   
   return writeIsosJson(data);

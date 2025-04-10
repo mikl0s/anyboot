@@ -153,11 +153,14 @@ export class UI {
                 console.log('Creating new toast container in DOM');
                 this.toastContainer = document.createElement('div');
                 this.toastContainer.id = 'toast-container';
+                // Position at the bottom of the page instead of the top
                 this.toastContainer.className = 'fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-reverse space-y-2';
                 document.body.appendChild(this.toastContainer);
                 console.log('Toast container created and added to DOM');
             } else {
                 console.log('Using existing toast container from DOM');
+                // Ensure existing container is positioned at the bottom
+                this.toastContainer.className = 'fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-reverse space-y-2';
             }
             this.toastContainerReady = true;
         } catch (error) {
