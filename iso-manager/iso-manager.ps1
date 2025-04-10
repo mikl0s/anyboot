@@ -23,6 +23,7 @@ $DefaultConfig = @{
     AutoVerifyHashes   = $true
     HashAlgorithm      = "sha256"
     HashMatch          = "{filename}.{hashAlgorithm}"
+    DownloadDir        = "ISO-Archive"
 }
 
 # Global variables
@@ -37,7 +38,7 @@ $VerifyHash = $false
 $HashMatch = ""
 $Download = $false
 $TestMode = $false
-$DownloadDir = Join-Path $PWD "downloads"
+$DownloadDir = Join-Path $PWD $DefaultConfig.DownloadDir
 
 # Function to check required modules
 function Test-Requirements {

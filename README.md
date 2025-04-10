@@ -5,7 +5,7 @@
 **Your Multi-Boot Workstation, Simplified.**
 
 <!-- Badges - Centering these often uses <p align="center"> in GFM -->
-[![Build Status](https://img.shields.io/github/actions/workflow/status/mikl0s/anyboot/build.yml?branch=main&label=Build&logo=githubactions&logoColor=white)](https://github.com/mikl0s/anyboot/actions) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blueviolet.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-v0.1.0--alpha-blue)](./) [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](./#contributing) [![Platform: Anything with UEFI](https://img.shields.io/badge/Platform-Anything%20with%20UEFI-lightgrey)](./)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/mikl0s/anyboot/build.yml?branch=main&label=Build&logo=githubactions&logoColor=white)](https://github.com/mikl0s/anyboot/actions) [![License: ELv2](https://img.shields.io/badge/License-ELv2-blueviolet.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-v0.1.0--alpha-blue)](./) [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](./#contributing) [![Platform: Anything with UEFI](https://img.shields.io/badge/Platform-Anything%20with%20UEFI-lightgrey)](./)  
 
 ---
 
@@ -68,6 +68,74 @@ AnyBoot leverages a modern web stack within a tailored Linux environment:
 
 For a detailed breakdown, see [project-techstack.md](project-techstack.md).
 
+## Components
+
+### ISO Manager (iso-manager)
+
+The ISO Manager is a modular, multi-language suite of tools designed to simplify the management of OS installation images. It helps users find, download, verify, and organize ISO files for various operating systems.
+
+#### Key Features
+
+* **Modular Architecture**: Built with multiple specialized components, each under 500 lines of code for maintainability
+* **Hash Verification**: Automatically verifies downloaded ISOs against SHA256/MD5 hashes
+* **Multi-OS Support**: Handles Windows, Linux, and BSD distribution ISOs
+* **Command-Line Interface**: Powerful CLI for automation and scripting
+* **Customizable**: Configurable settings via `iso-manager.conf`
+
+#### Components
+
+* **Core Scripts**:
+  * `iso-manager.sh`: Main Bash script for basic operations
+  * `iso-manager-utils.sh`: Utility functions for the Bash component
+  * `iso-manager-core.js`: Main Node.js script for advanced operations
+
+* **Specialized Modules**:
+  * `iso-utils.js`: Common utility functions
+  * `iso-downloader.js`: Handles file downloads with progress tracking
+  * `iso-list-manager.js`: Manages ISO lists and metadata
+  * `iso-hash-verifier.js`: Verifies file integrity
+
+#### Usage
+
+```bash
+# Basic ISO listing
+./iso-manager.sh list
+
+# Download an ISO with verification
+./iso-manager-core.js download --download-dir ./ISO-Archive
+
+# Verify an existing ISO
+./iso-manager-core.js verify --hash-alg sha256
+```
+
+### ISO Manager Web Interface (iso-manager-web)
+
+The ISO Manager Web Interface provides a modern, user-friendly web application for managing OS installation images. It offers the same functionality as the command-line tools but with an intuitive visual interface.
+
+#### Key Features
+
+* **Modern UI**: Clean, responsive design with card-based layout and dark mode
+* **Visual Progress**: Real-time download progress with speed and ETA indicators
+* **ISO Browsing**: Visual catalog of available ISO images with filtering and search
+* **One-Click Downloads**: Simple, guided download experience
+* **Integrated Verification**: Built-in hash checking ensures file integrity
+
+#### Components
+
+* **Server**: Node.js Express server that communicates with the ISO Manager backend
+* **Frontend**: Modern JavaScript application with responsive UI
+* **API**: RESTful endpoints for ISO operations
+
+#### Usage
+
+```bash
+# Start the web interface
+cd iso-manager
+./run-web.sh
+
+# Access the interface at http://localhost:5001
+```
+
 ## Getting Started
 
 *AnyBoot is currently under active development. These are the intended steps:*
@@ -109,4 +177,4 @@ See the [LICENSE](LICENSE) file for full details.
 
 ---
 
-*Copyright © 2025 Dataloes / Mikkel Georgsen*
+*Copyright 2025 Dataloes / Mikkel Georgsen*

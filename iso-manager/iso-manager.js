@@ -30,7 +30,9 @@ const DEFAULT_CONFIG = {
   gitRepo: 'https://github.com/mikl0s/iso-list.git',
   gitBranch: 'main',
   hashAlgorithm: 'sha256',
-  hashMatch: '{filename}.{hashAlgorithm}'
+  hashMatch: '{filename}.{hashAlgorithm}',
+  downloadDir: 'ISO-Archive', // Default download directory
+  isoArchive: 'ISO-Archive' // Default ISO archive directory
 };
 
 // Load configuration from file if exists
@@ -162,34 +164,6 @@ Examples:
   }
   
   return options;
-}
-
-// Show help information
-function showHelp() {
-  console.log('ISO Manager - CLI tool for managing Linux distribution ISOs');
-  console.log('');
-  console.log('Usage: node iso-manager.js [command] [options]');
-  console.log('');
-  console.log('Commands:');
-  console.log('  list [URL]             Get ISOs from a JSON list URL');
-  console.log('  verify [URL]           Verify and update ISO hashes');
-  console.log('  download [URL]         Download an ISO file');
-  console.log('');
-  console.log('Options:');
-  console.log('  --json, -j             Output in JSON format');
-  console.log('  --save=PATH, -s PATH   Save the results to specified path');
-  console.log('  --limit=N, -l N        Limit results to top N items');
-  console.log('  --git, -g              Auto-commit and push changes to GitHub');
-  console.log('  --verify, -v           Verify ISO hashes and update if changed');
-  console.log('  --hash-match           Pattern to look for hash file (default: {filename}.{hashAlgorithm})');
-  console.log('                  Use {filename} and {hashAlgorithm} as placeholders');
-  console.log('  --download, -d         Download an ISO file');
-  console.log('  --test, -t             Test mode - delete file after verification');
-  console.log('  --download-dir         Directory to save downloaded files (default: ./downloads)');
-  console.log('  --help, -h             Show this help message');
-  console.log('');
-  console.log('Configuration:');
-  console.log('  Settings can be configured in iso-manager.conf');
 }
 
 /**
@@ -942,170 +916,235 @@ function formatSize(bytes) {
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 }
 
-/**
- * Download a file from a URL and verify its hash
- * @param {string} url - URL to download from
- * @param {string} outputPath - Path to save the file
- * @param {string} expectedHash - Expected hash value
- * @param {string} hashAlgorithm - Hash algorithm to use
- * @returns {Promise<Object>} - Download result
- */
-async function downloadAndVerifyFile(url, outputPath, expectedHash, hashAlgorithm) {
-  return new Promise((resolve, reject) => {
-    const { baseUrl, filename } = parseUrl(url);
-    console.log(`\nDownloading ${filename} from ${baseUrl}...`);
+class IsoManager {
+  constructor() {
+    this.watcher = null;
+    this.setupArchiveWatcher();
+  }
+
+  setupArchiveWatcher() {
+    const config = loadConfig();
+    const archivePath = path.resolve(config.isoArchive || 'ISO-Archive');
     
-    // Create output file stream
-    const fileStream = fs.createWriteStream(outputPath);
-    
-    // Create hash stream
-    const hash = createHash(hashAlgorithm);
-    
-    // Set up progress tracking
-    let downloadedBytes = 0;
-    let totalBytes = 0;
-    let lastProgressUpdate = Date.now();
-    let startTime = Date.now();
-    
-    const client = url.startsWith('https') ? https : http;
-    const request = client.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    }, (response) => {
-      // Handle redirects
-      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-        // Close current streams
-        fileStream.close();
-        fs.unlinkSync(outputPath);
-        
-        // Follow redirect
-        const redirectUrl = new URL(response.headers.location, url).toString();
-        console.log(`Following redirect: ${url} -> ${redirectUrl}`);
-        downloadAndVerifyFile(redirectUrl, outputPath, expectedHash, hashAlgorithm)
-          .then(resolve)
-          .catch(reject);
-        return;
+    try {
+      console.log(`Setting up watcher for ISO archive: ${archivePath}`);
+      
+      // Check if directory exists, create if it doesn't
+      if (!fs.existsSync(archivePath)) {
+        console.log(`Archive directory doesn't exist, creating: ${archivePath}`);
+        fs.mkdirSync(archivePath, { recursive: true });
       }
       
-      // Check for successful response
-      if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download: HTTP ${response.statusCode}`));
-        return;
-      }
-      
-      // Get total file size
-      totalBytes = parseInt(response.headers['content-length'] || '0', 10);
-      console.log(`Total size: ${formatSize(totalBytes)}`);
-      
-      // Pipe the response to file and hash streams
-      response.on('data', (chunk) => {
-        hash.update(chunk);
-        downloadedBytes += chunk.length;
-        
-        // Update progress every 1 second
-        const now = Date.now();
-        if (now - lastProgressUpdate > 1000) {
-          updateDownloadProgress(downloadedBytes, totalBytes, startTime);
-          lastProgressUpdate = now;
+      // Initialize watcher
+      this.watcher = fs.watch(archivePath, (eventType, filename) => {
+        console.log(`Archive event: ${eventType} - ${filename}`);
+        if (eventType === 'rename' || eventType === 'change') {
+          this.emit('archive-updated');
         }
       });
       
-      response.pipe(fileStream);
+      this.watcher.on('error', (err) => {
+        console.error('Archive watcher error:', err);
+      });
+    } catch (error) {
+      console.error('Error setting up archive watcher:', error);
+    }
+  }
+  
+  async listArchiveFiles() {
+    const config = loadConfig();
+    const archivePath = path.resolve(config.isoArchive || 'ISO-Archive');
+    try {
+      const files = await fs.promises.readdir(archivePath);
+      return files
+        .filter(file => file.endsWith('.iso') || file.endsWith('.esd'))
+        .map(file => ({
+          name: file,
+          path: path.join(archivePath, file),
+          size: fs.statSync(path.join(archivePath, file)).size
+        }));
+    } catch (err) {
+      console.error('Error reading archive:', err);
+      return [];
+    }
+  }
+  
+  async followRedirects(url, maxRedirects = 5) {
+    let currentUrl = url;
+    for (let i = 0; i < maxRedirects; i++) {
+      const response = await new Promise((resolve) => {
+        const httpModule = currentUrl.startsWith('https:') ? https : http;
+        httpModule.get(currentUrl, (res) => resolve(res))
+          .on('error', () => resolve(null));
+      });
       
-      fileStream.on('finish', () => {
-        fileStream.close();
-        const calculatedHash = hash.digest('hex');
-        
-        // Final progress update
-        updateDownloadProgress(downloadedBytes, totalBytes, startTime, true);
-        
-        // Verify hash
-        const hashMatch = expectedHash ? (calculatedHash.toLowerCase() === expectedHash.toLowerCase()) : true;
-        
-        console.log('\nDownload complete!');
-        console.log(`File saved to: ${outputPath}`);
-        console.log(`Calculated ${hashAlgorithm} hash: ${calculatedHash}`);
-        
-        if (expectedHash) {
-          console.log(`Expected ${hashAlgorithm} hash:   ${expectedHash}`);
-          console.log(`Hash verification: ${hashMatch ? '✅ Passed' : '❌ Failed'}`);
-        } else {
-          console.log('No expected hash provided for verification.');
+      if (!response || ![301, 302].includes(response.statusCode)) {
+        return currentUrl;
+      }
+      currentUrl = new URL(response.headers.location, currentUrl).toString();
+    }
+    return currentUrl;
+  }
+
+  async downloadAndVerifyFile(params) {
+    const {
+      url,
+      outputPath,
+      verify = false,
+      hashAlgorithm = 'sha256',
+      signal,
+      onProgress
+    } = params;
+    
+    const finalUrl = await this.followRedirects(url);
+    const httpModule = finalUrl.startsWith('https:') ? https : http;
+    
+    // Ensure outputPath exists and is valid
+    const finalOutputPath = outputPath || DEFAULT_CONFIG.downloadDir;
+    const resolvedOutputPath = path.resolve(finalOutputPath);
+    
+    try {
+      await fs.promises.mkdir(resolvedOutputPath, { recursive: true });
+    } catch (err) {
+      throw new Error(`Failed to create download directory: ${err.message}`);
+    }
+    
+    const filename = finalUrl.split('/').pop();
+    const downloadPath = path.join(resolvedOutputPath, filename);
+    console.log(`Downloading to: ${downloadPath}`);
+    
+    // Create a write stream for the file
+    const fileStream = fs.createWriteStream(downloadPath);
+    
+    return new Promise((resolve, reject) => {
+      // Error handlers
+      fileStream.on('error', (err) => {
+        reject(new Error(`File write error: ${err.message}`));
+      });
+      
+      // Use https for HTTPS URLs, http otherwise
+      const request = httpModule.get(finalUrl, (response) => {
+        // Handle redirects
+        if (response.statusCode === 301 || response.statusCode === 302) {
+          const redirectUrl = new URL(response.headers.location, finalUrl).toString();
+          fileStream.destroy();
+          return resolve(this.downloadAndVerifyFile({
+            ...params,
+            url: redirectUrl
+          }));
         }
         
+        if (response.statusCode !== 200) {
+          fileStream.destroy();
+          return reject(new Error(`HTTP ${response.statusCode}`));
+        }
+        
+        const totalBytes = parseInt(response.headers['content-length'], 10) || 0;
+        let bytesTransferred = 0;
+        
+        // Pipe data with progress tracking
+        response.on('data', (chunk) => {
+          bytesTransferred += chunk.length;
+          if (onProgress) {
+            onProgress({
+              percentage: totalBytes > 0 ? (bytesTransferred / totalBytes) * 100 : 0,
+              bytesTransferred,
+              totalBytes,
+              filename: filename
+            });
+          }
+        });
+        
+        response.pipe(fileStream);
+      });
+      
+      request.on('error', (err) => {
+        fileStream.destroy();
+        reject(err);
+      });
+      
+      fileStream.on('finish', () => {
         resolve({
           success: true,
-          hashMatch,
-          calculatedHash,
-          filePath: outputPath
+          filePath: downloadPath,
+          filename,
+          size: bytesTransferred
         });
       });
     });
-    
-    request.on('error', (err) => {
-      fileStream.close();
-      fs.unlinkSync(outputPath);
-      reject(err);
-    });
-    
-    // Set a timeout
-    request.setTimeout(300000, () => { // 5 minutes
-      request.destroy();
-      fileStream.close();
-      fs.unlinkSync(outputPath);
-      reject(new Error('Download timed out'));
-    });
-  });
-}
-
-/**
- * Update download progress in the terminal
- * @param {number} downloaded - Downloaded bytes
- * @param {number} total - Total bytes
- * @param {number} startTime - Download start time
- * @param {boolean} final - If this is the final update
- */
-function updateDownloadProgress(downloaded, total, startTime, final = false) {
-  const elapsedSeconds = (Date.now() - startTime) / 1000;
-  const speed = downloaded / elapsedSeconds; // bytes per second
-  const progress = total > 0 ? (downloaded / total) * 100 : 0;
-  
-  // Calculate ETA
-  let eta = 'Unknown';
-  if (speed > 0 && total > 0) {
-    const remainingSeconds = (total - downloaded) / speed;
-    eta = formatTime(remainingSeconds);
   }
   
-  // Create progress bar
-  const progressBarWidth = 30;
-  const filledWidth = Math.round(progress * progressBarWidth / 100);
-  const progressBar = '█'.repeat(filledWidth) + '░'.repeat(progressBarWidth - filledWidth);
-  
-  const status = `${formatSize(downloaded)} / ${formatSize(total)} | ${progress.toFixed(2)}% | ${formatSize(speed)}/s | ETA: ${eta}`;
-  process.stdout.clearLine ? process.stdout.clearLine() : null;
-  process.stdout.cursorTo ? process.stdout.cursorTo(0) : null;
-  
-  if (!final) {
-    process.stdout.write(`Progress: ${progressBar} ${status}`);
-  } else {
-    process.stdout.write(`Complete: ${progressBar} ${status}\n`);
+  async downloadIso(params) {
+    const { url, verify, hashAlgorithm, signal, onProgress } = params;
+    const finalOutputPath = params.outputPath || DEFAULT_CONFIG.downloadDir;
+    
+    try {
+      // Create downloads directory if it doesn't exist
+      if (!fs.existsSync(finalOutputPath)) {
+        fs.mkdirSync(finalOutputPath, { recursive: true });
+      }
+      
+      // Parse the URL to get the filename
+      const { filename } = parseUrl(url);
+      const downloadPath = path.join(finalOutputPath, filename);
+      
+      const startTime = Date.now(); // Track start time for duration calculation
+      
+      // Create a wrapper for the progress callback
+      const progressWrapper = (progress) => {
+        if (typeof onProgress === 'function') {
+          onProgress(progress);
+        }
+      };
+      
+      // Download and verify the file
+      const result = await this.downloadAndVerifyFile({
+        url, 
+        outputPath: finalOutputPath, 
+        verify,
+        hashAlgorithm,
+        onProgress: progressWrapper,
+        signal
+      });
+      
+      // Add duration to result
+      const endTime = Date.now();
+      result.duration = (endTime - startTime) / 1000; // in seconds
+      
+      return result;
+    } catch (error) {
+      console.error('Error downloading ISO:', error);
+      throw error;
+    }
   }
-}
-
-/**
- * Format time in human-readable format
- * @param {number} seconds - Time in seconds
- * @returns {string} - Formatted time
- */
-function formatTime(seconds) {
-  if (seconds < 60) {
-    return `${Math.round(seconds)}s`;
-  } else if (seconds < 3600) {
-    return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
-  } else {
-    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+  
+  /**
+   * Calculate the hash of a file
+   * @param {string} filePath - Path to the file
+   * @param {string} algorithm - Hash algorithm to use
+   * @returns {Promise<string>} - Calculated hash
+   */
+  async calculateFileHash(filePath, algorithm = 'sha256') {
+    return new Promise((resolve, reject) => {
+      try {
+        const hash = crypto.createHash(algorithm);
+        const stream = fs.createReadStream(filePath);
+        
+        stream.on('error', err => {
+          reject(new Error(`Failed to read file: ${err.message}`));
+        });
+        
+        stream.on('data', chunk => {
+          hash.update(chunk);
+        });
+        
+        stream.on('end', () => {
+          resolve(hash.digest('hex'));
+        });
+      } catch (err) {
+        reject(new Error(`Hash calculation error: ${err.message}`));
+      }
+    });
   }
 }
 
@@ -1129,17 +1168,19 @@ async function downloadIso(isos, options) {
     }
     
     // Determine download directory
-    const downloadDir = options.downloadDir || path.join(process.cwd(), 'downloads');
+    const config = loadConfig();
+    const downloadDir = options.downloadDir || path.join(process.cwd(), config.downloadDir || 'ISO-Archive');
     if (!fs.existsSync(downloadDir)) {
       fs.mkdirSync(downloadDir, { recursive: true });
+      console.log(`Created download directory: ${downloadDir}`);
     }
     
-    const outputPath = path.join(downloadDir, filename);
+    const downloadPath = path.join(downloadDir, filename);
     
     // Check if file already exists
-    if (fs.existsSync(outputPath)) {
+    if (fs.existsSync(downloadPath)) {
       const rl = createReadlineInterface();
-      const answer = await askQuestion(`\nFile already exists: ${outputPath}\nOverwrite? (y/n): `, rl);
+      const answer = await askQuestion(`\nFile already exists: ${downloadPath}\nOverwrite? (y/n): `, rl);
       rl.close();
       
       if (answer.toLowerCase() !== 'y') {
@@ -1149,18 +1190,20 @@ async function downloadIso(isos, options) {
     }
     
     // Download and verify file
-    const result = await downloadAndVerifyFile(
-      selectedIso.link,
-      outputPath,
-      selectedIso.hash,
-      selectedIso.hashAlgorithm
-    );
+    const result = await new IsoManager().downloadIso({
+      url: selectedIso.link, 
+      outputPath: downloadDir, 
+      verify: options.verifyHash,
+      hashAlgorithm: selectedIso.hashAlgorithm,
+      onProgress: options.onProgress,
+      signal: options.signal
+    });
     
     // Test mode - delete file after verification
     if (options.testMode && result.success) {
       console.log('\nTest mode enabled - deleting downloaded file');
-      fs.unlinkSync(outputPath);
-      console.log(`File deleted: ${outputPath}`);
+      fs.unlinkSync(result.filePath);
+      console.log(`File deleted: ${result.filePath}`);
     }
     
     return result;
@@ -1323,7 +1366,9 @@ async function main() {
         
         await downloadIso(isos, {
           downloadDir: args.downloadDir,
-          testMode: args.test
+          testMode: args.test,
+          onProgress: args.onProgress,
+          signal: args.signal
         });
         
         break;
@@ -1340,5 +1385,109 @@ async function main() {
   }
 }
 
-// Execute the main function
-main();
+// Check if this file is being run directly or required as a module
+if (require.main === module) {
+  // Execute the main function when run directly
+  main();
+} else {
+  // Export functions when required as a module
+  module.exports = function (config = {}) {
+    const isoManager = new IsoManager();
+    
+    return {
+      fetchIsoList: async function({ url, mode }) {
+        try {
+          const config = loadConfig();
+          const targetUrl = url || config.defaultIsoListUrl;
+          
+          // If mode is list, fetch the JSON directly
+          if (mode === 'list') {
+            const data = await fetchData(targetUrl);
+            return JSON.parse(data);
+          }
+          
+          return [];
+        } catch (error) {
+          console.error('Error fetching ISO list:', error);
+          throw error;
+        }
+      },
+      downloadIso: async function({ url, outputPath, verify, hashAlgorithm, onProgress, signal }) {
+        try {
+          // Create downloads directory if it doesn't exist
+          if (!fs.existsSync(outputPath)) {
+            fs.mkdirSync(outputPath, { recursive: true });
+          }
+          
+          // Parse the URL to get the filename
+          const { filename } = parseUrl(url);
+          const downloadPath = path.join(outputPath, filename);
+          
+          const startTime = Date.now(); // Track start time for duration calculation
+          
+          // Create a wrapper for the progress callback
+          const progressWrapper = (progress) => {
+            if (typeof onProgress === 'function') {
+              onProgress(progress);
+            }
+          };
+          
+          // Download and verify the file
+          const result = await isoManager.downloadIso({
+            url, 
+            outputPath, 
+            verify,
+            hashAlgorithm,
+            onProgress: progressWrapper,
+            signal
+          });
+          
+          // Add file size and path to result
+          if (result.filePath) {
+            try {
+              result.size = fs.statSync(result.filePath).size;
+            } catch (err) {
+              console.error('Error getting file stats:', err);
+            }
+          }
+          
+          // Add duration to result
+          const endTime = Date.now();
+          result.duration = (endTime - startTime) / 1000; // in seconds
+          
+          return result;
+        } catch (error) {
+          console.error('Error downloading ISO:', error);
+          throw error;
+        }
+      },
+      verifyIso: async function({ filePath, expectedHash, algorithm }) {
+        try {
+          if (!fs.existsSync(filePath)) {
+            throw new Error(`File not found: ${filePath}`);
+          }
+          
+          // Calculate hash for the file
+          const hash = await isoManager.calculateFileHash(filePath, algorithm);
+          
+          const isValid = expectedHash ? (hash.toLowerCase() === expectedHash.toLowerCase()) : true;
+          
+          return {
+            filePath,
+            hash,
+            expectedHash,
+            algorithm,
+            isValid,
+            message: isValid ? 'Hash verified successfully' : 'Hash verification failed'
+          };
+        } catch (error) {
+          console.error('Error verifying ISO:', error);
+          throw error;
+        }
+      },
+      findHashFile,
+      calculateHashFromUrl,
+      verifyIsoHash
+    };
+  };
+}
