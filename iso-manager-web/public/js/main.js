@@ -473,7 +473,8 @@ function IsoManagerApp() {
     isoList: [],
     isoListUrl: null,
     activeDownloads: new Map(),
-    osMapping: {}
+    osMapping: {},
+    config: {}
   };
   
   // Load OS list mapping
@@ -570,28 +571,21 @@ IsoManagerApp.prototype.setupEventListeners = function() {
 
 IsoManagerApp.prototype.fetchServerStatus = function() {
   var self = this;
-  fetch('/api/status')
+  
+  // Fetch server status and configuration
+  fetch('/api/config')
     .then(function(response) {
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}: ${response.statusText}`);
       }
       return response.json();
     })
-    .then(function(status) {
-      console.log('Server status:', status);
-      
-      // Update state
-      self.state.serverStatus = status;
-      
-      // Update URL input if it exists
-      var urlInput = document.getElementById('iso-list-url');
-      if (urlInput && status.defaultIsoListUrl) {
-        urlInput.value = status.defaultIsoListUrl;
-      }
+    .then(function(data) {
+      console.log('Server configuration:', data);
+      self.state.config = data;
     })
     .catch(function(error) {
       console.error('Error fetching server status:', error);
-      throw error;
     });
 };
 
@@ -844,8 +838,14 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
   try {
     console.log('Verification requested for:', iso);
     
-    // Create toast for verification
-    var toast = this.ui.showToast(`Verifying ${iso.name}...`, 'info', 0, true);
+    // Check if the ISO has a path property
+    if (!iso.path) {
+      // For ISOs in the archive, we need to construct the path
+      const archivePath = self.state.config.isoArchive || '/home/mikkel/repos/anyboot/iso-manager/ISO-Archive';
+      const isoFilename = new URL(iso.url).pathname.split('/').pop();
+      iso.path = `${archivePath}/${isoFilename}`;
+      console.log('Constructed ISO path:', iso.path);
+    }
     
     // Call the API to verify ISO
     fetch('/api/verify', {
@@ -855,7 +855,8 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
       },
       body: JSON.stringify({
         path: iso.path,
-        algorithm: iso.hashAlgorithm || 'sha256'
+        algorithm: iso.hashAlgorithm || 'sha256',
+        expectedHash: iso.hash || ''
       })
     })
       .then(function(response) {
@@ -865,20 +866,21 @@ IsoManagerApp.prototype.handleVerifyRequest = function(iso) {
         return response.json();
       })
       .then(function(result) {
-        // Update toast based on result
-        if (result.verified) {
-          self.ui.updateToast(toast, `${iso.name} verified successfully`, 'success', 0, true);
+        console.log('Verification result:', result);
+        // Show verification result as toast
+        if (result.isValid) {
+          self.ui.showToast(`${iso.name} verified successfully`, 'success', 5000, false);
         } else {
-          self.ui.updateToast(toast, `${iso.name} verification failed`, 'error', 0, true);
+          self.ui.showToast(`${iso.name} verification failed`, 'error', 5000, false);
         }
       })
       .catch(function(error) {
         console.error('Error handling verify request:', error);
-        self.ui.updateToast(toast, `Verification error: ${error.message}`, 'error', 0, true);
+        self.ui.showToast(`Verification error: ${error.message}`, 'error', 5000, false);
       });
   } catch (error) {
     console.error('Error handling verify request:', error);
-    this.ui.showToast(`Verification error: ${error.message}`, 'error', 0, true);
+    self.ui.showToast(`Verification error: ${error.message}`, 'error', 5000, false);
   }
 };
 

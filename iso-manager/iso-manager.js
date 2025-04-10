@@ -1165,6 +1165,32 @@ class IsoManager {
       }
     });
   }
+  
+  async verifyFile(params) {
+    const { filePath, expectedHash, algorithm } = params;
+    try {
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File not found: ${filePath}`);
+      }
+      
+      // Calculate hash for the file
+      const hash = await this.calculateFileHash(filePath, algorithm);
+      
+      const isValid = expectedHash ? (hash.toLowerCase() === expectedHash.toLowerCase()) : true;
+      
+      return {
+        filePath,
+        hash,
+        expectedHash,
+        algorithm,
+        isValid,
+        message: isValid ? 'Hash verified successfully' : 'Hash verification failed'
+      };
+    } catch (error) {
+      console.error('Error verifying file:', error);
+      throw error;
+    }
+  }
 }
 
 /**
@@ -1505,7 +1531,8 @@ if (require.main === module) {
       },
       findHashFile,
       calculateHashFromUrl,
-      verifyIsoHash
+      verifyIsoHash,
+      verifyFile: isoManager.verifyFile.bind(isoManager)
     };
   };
 }

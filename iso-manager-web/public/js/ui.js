@@ -234,7 +234,7 @@ export class UI {
             // Add message if provided
             if (options.message) {
                 const message = document.createElement('p');
-                message.className = 'text-sm text-gray-300';
+                message.className = 'text-sm text-gray-300 whitespace-pre-line';
                 message.textContent = options.message;
                 content.appendChild(message);
             }
@@ -1200,6 +1200,180 @@ export class UI {
         
         // Return path to 64x64 icon
         return `/OS-Logos/64x64/${osCode}.png`;
+    }
+
+    /**
+     * Create a verification modal for ISO verification
+     * @param {Object} iso - ISO object being verified
+     * @returns {Object} - Modal elements and methods
+     */
+    createVerificationModal(iso) {
+        try {
+            // Create backdrop
+            const backdrop = document.createElement('div');
+            backdrop.className = 'verification-modal-backdrop';
+            document.body.appendChild(backdrop);
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'verification-modal';
+            
+            // Create header
+            const header = document.createElement('div');
+            header.className = 'verification-modal-header';
+            
+            const title = document.createElement('h3');
+            title.className = 'verification-modal-title';
+            title.textContent = `Verifying ${iso.name}`;
+            
+            const closeButton = document.createElement('button');
+            closeButton.className = 'verification-modal-close';
+            closeButton.innerHTML = '<i class="fas fa-times"></i>';
+            closeButton.addEventListener('click', () => {
+                this.closeVerificationModal({ modal, backdrop });
+            });
+            
+            header.appendChild(title);
+            header.appendChild(closeButton);
+            
+            // Create body
+            const body = document.createElement('div');
+            body.className = 'verification-modal-body';
+            
+            // Create steps
+            const fileStep = this.createVerificationStep('Locating ISO file', 'pending');
+            const hashStep = this.createVerificationStep('Calculating hash', 'pending');
+            const compareStep = this.createVerificationStep('Comparing hash values', 'pending');
+            
+            body.appendChild(fileStep.element);
+            body.appendChild(hashStep.element);
+            body.appendChild(compareStep.element);
+            
+            // Create footer
+            const footer = document.createElement('div');
+            footer.className = 'verification-modal-footer';
+            
+            const closeModalButton = document.createElement('button');
+            closeModalButton.className = 'verification-modal-button primary';
+            closeModalButton.textContent = 'Close';
+            closeModalButton.addEventListener('click', () => {
+                this.closeVerificationModal({ modal, backdrop });
+            });
+            
+            footer.appendChild(closeModalButton);
+            
+            // Assemble modal
+            modal.appendChild(header);
+            modal.appendChild(body);
+            modal.appendChild(footer);
+            
+            document.body.appendChild(modal);
+            
+            // Return modal elements and update methods
+            return {
+                modal,
+                backdrop,
+                steps: {
+                    fileStep,
+                    hashStep,
+                    compareStep
+                },
+                close: () => this.closeVerificationModal({ modal, backdrop })
+            };
+        } catch (error) {
+            console.error('Error creating verification modal:', error);
+            return null;
+        }
+    }
+    
+    /**
+     * Create a verification step element
+     * @param {string} title - Step title
+     * @param {string} status - Step status (pending, success, error)
+     * @param {string} details - Optional step details
+     * @returns {Object} - Step element and update methods
+     */
+    createVerificationStep(title, status = 'pending', details = '') {
+        const step = document.createElement('div');
+        step.className = `verification-step ${status}`;
+        
+        const iconContainer = document.createElement('div');
+        iconContainer.className = 'verification-step-icon';
+        
+        let icon = '';
+        if (status === 'pending') {
+            icon = '<i class="fas fa-spinner fa-spin"></i>';
+        } else if (status === 'success') {
+            icon = '<i class="fas fa-check-circle text-accent3-500"></i>';
+        } else if (status === 'error') {
+            icon = '<i class="fas fa-times-circle text-accent2-500"></i>';
+        }
+        
+        iconContainer.innerHTML = icon;
+        
+        const content = document.createElement('div');
+        content.className = 'verification-step-content';
+        
+        const titleElement = document.createElement('div');
+        titleElement.className = 'verification-step-title';
+        titleElement.textContent = title;
+        
+        const detailsElement = document.createElement('div');
+        detailsElement.className = 'verification-step-details';
+        detailsElement.textContent = details;
+        
+        content.appendChild(titleElement);
+        if (details) {
+            content.appendChild(detailsElement);
+        }
+        
+        step.appendChild(iconContainer);
+        step.appendChild(content);
+        
+        return {
+            element: step,
+            iconContainer,
+            titleElement,
+            detailsElement,
+            updateStatus: (newStatus) => {
+                step.className = `verification-step ${newStatus}`;
+                
+                let newIcon = '';
+                if (newStatus === 'pending') {
+                    newIcon = '<i class="fas fa-spinner fa-spin"></i>';
+                } else if (newStatus === 'success') {
+                    newIcon = '<i class="fas fa-check-circle text-accent3-500"></i>';
+                } else if (newStatus === 'error') {
+                    newIcon = '<i class="fas fa-times-circle text-accent2-500"></i>';
+                }
+                
+                iconContainer.innerHTML = newIcon;
+            },
+            updateDetails: (newDetails) => {
+                detailsElement.textContent = newDetails;
+                if (newDetails) {
+                    content.appendChild(detailsElement);
+                } else {
+                    if (detailsElement.parentNode === content) {
+                        content.removeChild(detailsElement);
+                    }
+                }
+            }
+        };
+    }
+    
+    /**
+     * Close the verification modal
+     * @param {Object} modal - Modal elements
+     */
+    closeVerificationModal({ modal, backdrop }) {
+        if (modal && modal.parentNode) {
+            modal.parentNode.removeChild(modal);
+        }
+        
+        if (backdrop && backdrop.parentNode) {
+            backdrop.parentNode.removeChild(backdrop);
+        }
     }
 
     /**

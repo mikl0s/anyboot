@@ -346,7 +346,7 @@ app.get('/api/isos', async (req, res) => {
 // API endpoint to verify an ISO file
 app.post('/api/verify', async (req, res) => {
   try {
-    const { path: filePath, algorithm = 'sha256' } = req.body;
+    const { path: filePath, algorithm = 'sha256', expectedHash = '' } = req.body;
     
     if (!filePath) {
       return res.status(400).json({ error: 'File path is required' });
@@ -358,7 +358,11 @@ app.post('/api/verify', async (req, res) => {
     }
     
     // Call the iso-manager to verify the file
-    const result = await isoManager.verifyFile(filePath, algorithm);
+    const result = await isoManager.verifyFile({
+      filePath,
+      algorithm,
+      expectedHash
+    });
     res.json(result);
   } catch (error) {
     logger.error(`Error verifying file: ${error.message}`);
