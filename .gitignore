@@ -39,3 +39,7 @@ webapp/node_modules
 webapp/.next
 webapp/out
 webapp/.env*.local
+
+# ISO-Archive
+ISO-Archive/
+iso-manager/ISO-Archive/
