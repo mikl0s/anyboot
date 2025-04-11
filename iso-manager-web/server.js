@@ -724,6 +724,38 @@ app.get('/api/status', (req, res) => {
   }
 });
 
+// API endpoint to force refresh the ISO list from GitHub
+app.get('/api/refresh-isos', async (req, res) => {
+  try {
+    // Clear the cache to force a fresh fetch
+    isoListCache = null;
+    isoListCacheTime = null;
+    
+    logger.log('Forcing refresh of ISO list from GitHub');
+    
+    // Use the URL from config or default to GitHub URL
+    const url = config.defaultIsoListUrl || 'https://raw.githubusercontent.com/mikl0s/iso-list/main/links.json';
+    
+    // Fetch fresh data
+    const result = await checkAndUpdateIsoList(url);
+    
+    logger.log('Successfully refreshed ISO list from GitHub:', Object.keys(result).length, 'ISOs found');
+    
+    // Return success
+    res.json({ 
+      success: true, 
+      message: `Successfully refreshed ISO list: ${Object.keys(result).length} ISOs found`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Error refreshing ISO list from GitHub:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to refresh ISO list: ${error.message}` 
+    });
+  }
+});
+
 // Ensure ISO archive directory exists
 if (!fs.existsSync(config.isoArchive)) {
   try {

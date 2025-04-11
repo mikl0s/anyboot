@@ -139,7 +139,7 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
     card.dataset.isoFilename = filename || ''; // Store the filename
 
     // Format size
-    var sizeFormatted = this.formatSize(iso.size);
+    var sizeFormatted = this.formatFileSize(iso.size);
     
     // Determine OS logo based on OS name
     var osLogo = '';
@@ -269,9 +269,9 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
                 <i class="fas fa-tag mr-1"></i>
                 <span>${versionDisplay}</span>
               </div>
-              <div class="text-sm text-gray-400 flex items-center">
+              <div class="text-sm text-gray-400 flex items-center ml-auto mr-2">
                 <i class="fas fa-hdd mr-1"></i>
-                <span>${this.formatSize(iso.size || 0)}</span>
+                <span>${this.formatFileSize(iso.size || 0)}</span>
               </div>
               ${badgeHtml} <!-- Display badge next to version if it exists -->
             </div>
@@ -405,7 +405,7 @@ function IsoGrid(containerId, downloadHandler, verifyHandler, deleteHandler) {
     return card;
   };
   
-  this.formatSize = function(bytes) {
+  this.formatFileSize = function(bytes) {
     if (!bytes || isNaN(bytes) || bytes <= 0) {
       return 'Unknown size';
     }
@@ -545,7 +545,53 @@ IsoManagerApp.prototype.setupEventListeners = function() {
   var refreshButton = document.getElementById('refreshBtn');
   if (refreshButton) {
     refreshButton.addEventListener('click', function() {
-      this.loadIsoList(true);
+      // Show a loading spinner on the button
+      refreshButton.innerHTML = '<i class="fas fa-sync fa-spin"></i>';
+      refreshButton.disabled = true;
+      
+      // First refresh the links.json from GitHub
+      fetch('/api/refresh-isos')
+        .then(response => response.json())
+        .then(data => {
+          console.log('GitHub refresh result:', data);
+          
+          // Show a toast notification
+          if (data.success) {
+            this.ui.createToast({
+              message: data.message,
+              type: 'success',
+              autoClose: true,
+              autoCloseDelay: 3000
+            });
+          } else {
+            this.ui.createToast({
+              message: `Error refreshing from GitHub: ${data.error}`,
+              type: 'error',
+              autoClose: true,
+              autoCloseDelay: 5000
+            });
+          }
+          
+          // Now load the ISO list with the refreshed data
+          this.loadIsoList(true);
+        })
+        .catch(error => {
+          console.error('Error refreshing from GitHub:', error);
+          this.ui.createToast({
+            message: `Error refreshing from GitHub: ${error.message}`,
+            type: 'error',
+            autoClose: true,
+            autoCloseDelay: 5000
+          });
+          
+          // Still try to refresh the ISO list
+          this.loadIsoList(true);
+        })
+        .finally(() => {
+          // Restore the button
+          refreshButton.innerHTML = '<i class="fas fa-sync"></i>';
+          refreshButton.disabled = false;
+        });
     }.bind(this));
   }
   
