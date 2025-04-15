@@ -125,6 +125,34 @@ const DiskSelection: React.FC<DiskSelectionProps> = ({ onDiskSelect }) => {
                      <p>
                         <span className="font-medium text-[#a9b1d6]">Interface:</span> {disk.tran ? disk.tran.toUpperCase() : 'N/A'} ({disk.type})
                      </p>
+                     {(() => {
+                       try {
+                         const { calculateBlocks } = require('@/lib/diskUtils');
+                         const blocks = calculateBlocks(disk.partitions, disk.sizeBytes);
+                         const unallocatedBlock = blocks.find((blk: any) => blk.isAllocated === false);
+                         if (unallocatedBlock) {
+                           return (
+                             <span className="block text-[#9ece6a] font-semibold mt-1">
+                               {unallocatedBlock.size} Free
+                             </span>
+                           );
+                         } else {
+                           // No free space, display 0.0 GB Free
+                           return (
+                             <span className="block text-[#9ece6a] font-semibold mt-1">
+                               0.0 GB Free
+                             </span>
+                           );
+                         }
+                       } catch (e) {
+                         // Fallback: show 0.0 GB Free
+                         return (
+                           <span className="block text-[#9ece6a] font-semibold mt-1">
+                             0.0 GB Free
+                           </span>
+                         );
+                       }
+                     })()}
                   </div>
                 </div>
               </div>
