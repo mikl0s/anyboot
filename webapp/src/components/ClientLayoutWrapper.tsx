@@ -17,6 +17,15 @@ export default function ClientLayoutWrapper({
   const pathname = usePathname();
   const { setCurrentStep } = useWizardActions();
 
+  // DEV_MODE browser log
+  useEffect(() => {
+    // Only log in the browser
+    if (typeof window !== 'undefined') {
+      // Log the public dev mode flag
+      console.log('DEV_MODE (client):', process.env.NEXT_PUBLIC_DEV_MODE);
+    }
+  }, []);
+
   // Synchronize store state with current path
   useEffect(() => {
     const currentRouteEntry = Object.entries(stepRoutes).find(([, route]) => route === pathname);

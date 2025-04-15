@@ -3,6 +3,10 @@ import { exec } from 'child_process';
 import util from 'util';
 import { LsblkOutput } from '@/lib/diskUtils';
 
+// Load environment variables
+const DEV_MODE = process.env.DEV_MODE === 'true';
+console.log('DEV_MODE (server):', DEV_MODE);
+
 // Promisify the exec function to use async/await
 const execPromise = util.promisify(exec);
 
@@ -220,7 +224,8 @@ export async function GET() {
     const diskDevices = lsblkStdout.split('\n')
       .filter(line => line.trim())
       .map(line => line.trim())
-      .filter(name => !name.startsWith('loop')); // Filter out loop devices
+      // Only filter out loop devices if not in dev mode
+      .filter(name => DEV_MODE ? true : !name.startsWith('loop'));
     
     // 2. Run parted on each device to get detailed information
     const disksData = await Promise.all(diskDevices.map(async (device) => {
@@ -228,6 +233,33 @@ export async function GET() {
         const { stdout } = await execPromise(`sudo parted -s /dev/${device} unit MiB print`);
         return parsePartedOutput(stdout, device);
       } catch (error) {
+        // If the error is 'unrecognised disk label', treat as empty new disk
+        if (error.stderr && error.stderr.includes('unrecognised disk label')) {
+          // Dynamically get the disk size using lsblk
+          try {
+            const { stdout: sizeStdout } = await execPromise(`lsblk -b -dn -o SIZE /dev/${device}`);
+            const sizeBytes = parseInt(sizeStdout.trim(), 10);
+            return {
+              name: device,
+              model: 'Unknown',
+              size: sizeBytes,
+              sizeUnit: 'B',
+              partitionTable: 'unknown',
+              children: []
+            };
+          } catch (lsblkError) {
+            console.warn(`Could not get size for /dev/${device}:`, lsblkError);
+            // Fallback: show device with unknown size
+            return {
+              name: device,
+              model: 'Unknown',
+              size: 0,
+              sizeUnit: 'B',
+              partitionTable: 'unknown',
+              children: []
+            };
+          }
+        }
         console.warn(`Error running parted on /dev/${device}:`, error);
         return null;
       }

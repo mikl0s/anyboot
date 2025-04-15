@@ -3,7 +3,7 @@
 # Script to run the latest built ISO with QEMU and bridged networking
 
 ISO_PATH="live-build-config/live-image-amd64.hybrid.iso"
-MEMORY=2048
+MEMORY=4096
 
 # Name of the TAP interface to use for bridging
 TAP_IF="tap0"
