@@ -232,9 +232,9 @@ export async function GET() {
       try {
         const { stdout } = await execPromise(`sudo parted -s /dev/${device} unit MiB print`);
         return parsePartedOutput(stdout, device);
-      } catch (error) {
+      } catch (error: unknown) {
         // If the error is 'unrecognised disk label', treat as empty new disk
-        if (error.stderr && error.stderr.includes('unrecognised disk label')) {
+        if (typeof error === 'object' && error !== null && 'stderr' in error && typeof (error as any).stderr === 'string' && (error as any).stderr.includes('unrecognised disk label')) {
           // Dynamically get the disk size using lsblk
           try {
             const { stdout: sizeStdout } = await execPromise(`lsblk -b -dn -o SIZE /dev/${device}`);
@@ -363,11 +363,11 @@ export async function GET() {
     let statusCode = 500;
 
     if (typeof error === 'object' && error !== null) {
-      if ('stderr' in error && typeof error.stderr === 'string') {
-        if (error.stderr.includes('command not found')) {
+      if ('stderr' in error && typeof (error as any).stderr === 'string') {
+        if ((error as any).stderr.includes('command not found')) {
           errorMessage = 'parted or lsblk command not found. Please ensure they are installed and available in the system PATH.';
           statusCode = 501;
-        } else if (error.stderr.includes('permission denied') || error.stderr.includes('Operation not permitted')) {
+        } else if ((error as any).stderr.includes('permission denied') || (error as any).stderr.includes('Operation not permitted')) {
           errorMessage = 'Permission denied executing commands. The backend process needs sudo permissions to read disk information.';
           statusCode = 403; // Forbidden
         }
